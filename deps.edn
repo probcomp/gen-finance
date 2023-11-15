@@ -5,5 +5,5 @@
          org.mentat/emmy               {:mvn/version "0.31.0"}
          org.mentat/emmy-viewers       {:mvn/version "0.3.1"}
          io.github.inferenceql/gen.clj
-         {:git/sha "b6d5a7e5c4e5841ed676c53b61a616ab57660f44"}}
+         {:git/sha "743e9d25da926d1d3f43ada66ccbdbd60e4af156"}}
  :aliases {:nextjournal/clerk {:exec-fn user/build!}}}
