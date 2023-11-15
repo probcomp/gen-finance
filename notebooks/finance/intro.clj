@@ -1,4 +1,6 @@
+^{:nextjournal.clerk/visibility {:code :hide}}
 (ns finance.intro
+  {:nextjournal.clerk/toc true}
   (:require [nextjournal.clerk :as clerk]))
 
 ;; # Welcome!
@@ -65,14 +67,16 @@
 ;; As previously mentioned, lots more
 ;; detail [here](http://andrewchenblog.com/2008/11/17/how-to-calculate-cost-per-acquisition-for-startups-relying-on-freemium-subscription-or-virtual-items-biz-models/).
 
-;; ### Model Tasks
+;; ### Model
 ;;
 ;; This first page encodes the following ideas:
 
-(defn assoc-cpa [{:keys [cost users] :as m}]
-  (assoc m :cpa (if (zero? users)
-                  ##Inf
-                  (/ cost users))))
+(defn cpa
+  [cost users]
+  (if (zero? users)
+    ##Inf
+    (double
+     (/ cost users))))
 
 (defn ^:no-doc process-row
   "Processes a single row for [[sheet-one]]."
@@ -110,7 +114,7 @@
    (map process-row)
    (fn
      ([] {:users 0 :cost 0 :clicks 0 :cpa ##Inf})
-     ([m] (assoc-cpa m))
+     ([m] (assoc m :cpa (cpa (:cost m) (:users m))))
      ([l r]
       (merge-with + l r)))
    ms))
@@ -165,7 +169,6 @@
 ;; Businesses that aren’t eyeball businesses shouldn’t act like eyeball
 ;; businesses :-)
 
-
 ;; Anyway, the product design issue (and resultant conversion rates) are a a
 ;; deep topic, and here are some other related posts (by others and myself):
 
@@ -175,6 +178,81 @@
 ;; - Bridging your traffic engine with your revenue engine
 ;; - What’s your viral loop? Understanding your engine of adoption
 
+;; ### Model
+
+(defn funnel
+  "Generates a sequence.
+
+  I bet I can do this as a fold, so we get some state and fold in the previous
+  based on parameters. We want to wiggle the params at each phase.
+
+  Key meanings:
+
+  :users - initial number of registered users
+  :cost  - total ad spend (cpa == users / cost)
+  :free->pay - percentage of free converting to paid / time period
+  :ad-spend-increase - percentage increase in ad spend / time period
+
+  TODO alternatively we could provide CPA and users, and not total cost? but
+  that's awkward with how we're doing the increase i ad spend.
+
+  TODO the sheet also had these...
+  :invite-conversion-rate
+  :avg-invites
+  "
+  [{:keys [users
+           cost
+           free->pay
+           ad-spend-increase
+           viral-growth-kicker]
+    :or {free->pay 0 cost 0 users 0 ad-spend-increase 0 viral-growth-kicker 0}}]
+  (let [pay-rate   (/ free->pay 100)
+        paying     (Math/round ^double (* pay-rate users))
+        init-cpa   (cpa cost users)
+        spend-rate (inc (/ ad-spend-increase 100.0))
+        increment  (fn [{:keys [period total-new-users ad-spend
+                               cumulative-users
+                               cumulative-paying-users]}]
+                     (let [spend  (* ad-spend spend-rate)
+                           viral  (Math/round ^double (* viral-growth-kicker total-new-users))
+                           bought (Math/round ^double (/ spend init-cpa))
+                           total  (+ bought viral)
+                           paying (Math/round ^double (* pay-rate total))]
+                       {:period (inc period)
+                        :virally-acquired-users viral
+                        :bought-users bought
+                        :ad-spend spend
+                        :total-new-users total
+                        :paying-users paying
+                        :cumulative-users (+ cumulative-users total)
+                        :cumulative-paying-users (+ cumulative-paying-users paying)
+                        :cpa (cpa spend total)}))]
+    (iterate increment
+             {:period 0
+              :virally-acquired-users 0
+              :bought-users users
+              :ad-spend cost
+              :total-new-users users
+              :paying-users paying
+              :cumulative-users users
+              :cumulative-paying-users paying
+              :cpa (cpa cost users)})))
+
+(clerk/table
+ (take 10 (funnel
+           {:users 5130
+            :cost 33300
+            :free->pay 10
+            :ad-spend-increase 5
+            :viral-growth-kicker 0.75
+            :invite-conversion-rate 15
+            :avg-invites 5})))
+
+;; Notes:
+;;
+;; TODO - graph of users over time!
+;; TODO - tie this into the previous one!
+
 ;; ## User retention
 
 ;; Of course, it’s not enough to just acquire paying users, you need to retain
@@ -183,23 +261,27 @@
 ;; At worse, it’s easy to lose a ton of money, if the CPA exceeds the LTV. I
 ;; wrote about this topic earlier in my essay When and why do Facebook apps jump
 ;; the shark (which also has a spreadsheet).
-
-
+;;
 ;; How sensitive are retention numbers on lifetime value? Here’s a quick thought
 ;; experiment: Lifetime value is the sum of the revenue that a user might
 ;; generate from their first time period to when they quit the service. Think of
 ;; it as an infinite sum that looks like:
+;;
 
-
-;; $$LTV = rev + rev \cdot R + rev \cdot R^2 + rev \cdot R^3 + \ldots$$
+^{::clerk/visibility {:code :hide}}
+(clerk/tex
+ "LTV = rev + rev \\cdot R + rev \\cdot R^2 + rev \\cdot R^3 + \\ldots")
 
 ;; where $rev$ is the revenue that a user produces during a time period, and $R$
 ;; is the retention rate between time periods.
-
+;;
 ;; You can simplify this, based on the [magic of infinite
 ;; series](http://en.wikipedia.org/wiki/List_of_mathematical_series):
+;;
 
-;; $$LTV = \frac{1}{1-R} \cdot rev$$
+^{::clerk/visibility {:code :hide}}
+(clerk/tex
+ "LTV = \\frac{1}{1-R} \\cdot rev")
 
 ;; So let’s say that you make $1 per time period, and you have 1000 paying
 ;; users. Let’s compare the difference between a 50% retention rate and a 75%
@@ -211,29 +293,26 @@
 ;; At a 75% retention rate:
 ;;
 ;; LTV = 1/(1-0.75) * $1 * 1000 =  $4000
-
-
+;;
 ;; This means that in this case, by increasing your retention rate by
 ;; half (relatively speaking), you actually DOUBLE your revenue. And even more
 ;; when you reach “killer app” status and attain retention rates around 90%.
 ;; This is a big lever.
 
 ;; At a 90% retention rate:
-
+;;
 ;; LTV = 1/(1-0.90) * $1 * 1000 = $10,000
-
+;;
 ;; Note that retention rates are generally not fixed numbers – they usually get
 ;; better the longer a cohort of users stays with you! I’m using a fixed
 ;; retention number to set a lower bound, and for mathematical simplicity.
-
-
+;;
 ;; OK, so the biggest factors affecting retention boil down to three things:
-
-
+;;
 ;; * Product design
 ;; * Notifications (optimize them, of course)
 ;; * In success cases, saturation effects
-
+;;
 ;; For more reading on product design, I’d recommend Designing Interactions from
 ;; IDEO. For notifications, there’s been a lot of great work in the database and
 ;; catalog marketing world, for example Strategic Database Marketing. Tesco,
@@ -241,9 +320,61 @@
 ;; personalization and customer interaction. For saturation effects, as
 ;; previously mentioned, my old-ish article When and why do Facebook apps jump
 ;; the shark.
+;;
+;; ### Model
 
+(defn retention-fold
+  "Here on the diagonal, starting each time period we have the specific number
+  of paying users.
 
+  Then we take a rate, and model out decay per 'time period cohort'.
 
+  NOTE Returns a fold!
+
+  The sum of all of the entries for the time period - ie new users for that time
+  period plus the decayed out for all previous time periods - is the true total number of paying users.
+
+  TODO so we do it once with total new users and once with paying users."
+  [rate]
+  (fn
+    ([] [])
+    ([v] (reduce + v))
+    ([v amt]
+     (-> (mapv (fn [x] (Math/round ^double (* x rate))) v)
+         (conj amt)))))
+
+(defn scan
+  [fold xs]
+  (->> (reductions fold (fold) xs)
+       (rest)
+       (map fold)))
+
+(defn retention [rate k]
+  (fn [funnel-seq]
+    (scan ((map k)
+           (retention-fold rate))
+          funnel-seq)))
+
+;; Here are the final rows of this part of the sheet:
+
+(let [xs (funnel
+          {:users 5130
+           :cost 33300
+           :free->pay 10
+           :ad-spend-increase 5
+           :viral-growth-kicker 0.75
+           :invite-conversion-rate 15
+           :avg-invites 5})
+      ten-periods (take 10 xs)]
+  [((retention 0.8 :paying-users) ten-periods)
+   ((retention 0.8 :total-new-users) ten-periods)])
+
+;;
+;; Questions
+;;
+;; Alternatively we need to get lifetime value in here somehow, based on the
+;; discussion above. Or is that in the final one?
+;;
 ;; ## Cashflow (and ad-reinvestment)
 
 ;; The tab “cashflow” in the spreadsheet captures a couple different issues:
@@ -291,6 +422,8 @@
 ;; * Plus then you have to factor in the acquisition cost! (Probably a couple
 ;;   bucks per user, so thousands of bucks per 1000 users).
 
+;; ### Model
+
 ;; ## Lifetime value
 
 
@@ -310,10 +443,9 @@
 ;; this LTV number with the effective LTV that you get from buying users and
 ;; then factoring in their viral effects (as shown in the Funnel tab).
 
-
+;; ### Model
 
 ;; ## Model improvements
-
 
 ;; Of course there are tons of things in this model of freemium businesses that ought to be improved!
 ;;
@@ -328,3 +460,9 @@
 ;; * Better intelligence around ad-buying, including ramping up when profitable, slowing down when unprofitable
 
 ;; etc.
+
+;; ### Clerk Improvements
+;;
+;; - TODO note that without `clerk/tex`, with double-dollars, the toc breaks.
+;; - here's the video: https://www.youtube.com/watch?v=ztl8eBwq24k
+;; - mindmap https://media.assembly.org/jussi/blog/vgsummit2008-metrics.pdf
