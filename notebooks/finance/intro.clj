@@ -3,6 +3,8 @@
   {:nextjournal.clerk/toc true}
   (:require [emmy.clerk :as ec]
             [emmy.leva :as leva]
+            [gen.distribution.kixi :as kixi]
+            [gen.dynamic :as dynamic :refer [gen]]
             [nextjournal.clerk :as clerk]))
 
 ^{::clerk/visibility {:code :hide :result :hide}}
@@ -163,6 +165,10 @@
     :impressions 2000000
     :clickthrough 0.5
     :signup 20}))
+
+;; TODO - deeper refactoring to expose the conceptual model. There is a
+;; generator for events in the world (user joined, user clicked, etc)
+;;
 
 ;; - TODO - hook up leva sliders, make this more reactive
 ;; - TODO - make these generative
@@ -406,51 +412,92 @@
              +
              percent->rev))
 
-(defn process-retention
-  [retention-rate funnel-seq]
-  ;; TODO make these inputs obviously
-  (let [cost-of-service 0.1
-        revenue-per     (revenue-per-paying
-                         {0.1 25
-                          0.4 7.99
-                          0.5 1.50})]
-    (map (fn [{:keys [period ad-spend]} paying total-new]
-           (let [cost-of-service (* cost-of-service total-new)
-                 revenue         (* revenue-per paying)]
-             {:period          period
-              :ad-spend        ad-spend
-              :paying-users    paying
-              :total-new-users total-new
-              :revenue         revenue
-              :cost-of-service cost-of-service
-              :total-cost      (+ ad-spend cost-of-service)
-              :profit-per-user (/ (- revenue ad-spend cost-of-service)
-                                  paying)}))
-         funnel-seq
-         ((retention retention-rate :paying-users) funnel-seq)
-         ((retention retention-rate :total-new-users) funnel-seq))))
+(def process-retention
+  (gen [{:keys [retention-mean
+                cost-of-service
+                revenue-per-paying]
+         :or   {retention-mean     0
+                cost-of-service    0
+                revenue-per-paying 0}}
+        funnel-seq]
+    (let [retention-rate  (dynamic/trace! :retention kixi/normal retention-mean 0.1)
+          cost-of-service (dynamic/trace! :cost-of kixi/normal cost-of-service 0.1)]
+      (map (fn [{:keys [period ad-spend]} paying total-new]
+             (let [cost-of-service (* cost-of-service total-new)
+                   revenue         (* revenue-per-paying paying)]
+               {:period          period
+                :ad-spend        ad-spend
+                :paying-users    paying
+                :total-new-users total-new
+                :revenue         revenue
+                :cost-of-service cost-of-service
+                :total-cost      (+ ad-spend cost-of-service)
+                :profit-per-user (/ (- revenue ad-spend cost-of-service)
+                                    paying)}))
+           funnel-seq
+           ((retention retention-rate :paying-users) funnel-seq)
+           ((retention retention-rate :total-new-users) funnel-seq)))))
 
-(defn render-retention
+(defn render-retention-spec
   [n data]
-  (clerk/vl
-   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
-    :embed/opts {:actions false}
-    :data {:values (take n data)}
-    :width 650 :height 300
-    :layer
-    [{:mark :line
-      :encoding {:x {:field :period :type "temporal"}
-                 :y {:field :revenue :type "quantitative"}}}
-     {:mark {:type :line :color :red}
-      :encoding {:x {:field :period :type "temporal"}
-                 :y {:field :total-cost :type "quantitative"}}}]}))
+  {:schema "https://vega.github.io/schema/vega-lite/v5.json"
+   :embed/opts {:actions false}
+   :data {:values (take n data)}
+   :width 650 :height 300
+   :layer
+   [{:mark :line
+     :encoding {:x {:field :period :type "temporal"}
+                :y {:field :revenue :type "quantitative"}}}
+    {:mark {:type :line :color :red}
+     :encoding {:x {:field :period :type "temporal"}
+                :y {:field :total-cost :type "quantitative"}}}]})
 
-(def retention-rate
+(def render-retention
+  (comp clerk/vl render-retention-spec))
+
+(def retention-mean
   (:retention @!state))
+
+(def revenue-per-paying-user
+  (revenue-per-paying
+   {0.1 25
+    0.4 7.99
+    0.5 1.50}))
+
+(def retention-config
+  {:retention-mean     retention-mean
+   :cost-of-service    0.1
+   :revenue-per-paying revenue-per-paying-user})
 
 (def retention-data
   "decayed out users.."
-  (process-retention retention-rate funnel-data))
+  (process-retention retention-config funnel-data))
+
+(defn overlay
+  [layers]
+  (clerk/vl
+   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
+    :embed/opts {:actions false}
+    :layer layers}))
+
+;; TODO "simulate business" instead of "process retention", etc etc
+;;
+;; TODO scatterplot of total value vs one of the random parameters
+;;
+;; TODO (also maybe histogram of total value)
+;;
+;; TODO next - use importance sampling to enforce a complex constraint... this
+;; parameter is less than 10, total value is greater than 100. Find values of
+;; other parameters that satisfy these sets of constraints.
+;;
+;; TODO we want total value in the trace. do it by making it the mean of a
+;; normal with a slider for a (small) variance. Required for importance
+;; sampling. Try ~1000 samples, make broad priors at first.
+
+(overlay
+ (mapv (fn [data]
+         (render-retention-spec 10 data))
+       (repeatedly 10 #(process-retention retention-config funnel-data))))
 
 (let [n 20]
   (clerk/col
