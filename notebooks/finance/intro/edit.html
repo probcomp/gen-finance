@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta content="width=device-width, initial-scale=1" name="viewport"><meta property="og:description"><meta property="og:title"><meta content="article:clerk" property="og:type"><meta content="summary_large_image" name="twitter:card"><script src="https://cdn.tailwindcss.com?plugins=typography" type="text/javascript"></script><script>tailwind.config = {
+  darkMode: "class",
+  content: ["./tw/viewer.js", "./tw/**/*.edn"],
+  safelist: ['dark'],
+  theme: {
+    extend: {},
+    fontFamily: {
+      sans: ["Fira Sans", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+      serif: ["PT Serif", "serif"],
+      mono: ["Fira Mono", "monospace"]
+    }
+  },
+  variants: {
+    extend: {},
+  },
+  plugins: [],
+}
+</script><style type="text/tailwindcss">@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: 18px;
+  }
+  @media (max-width: 600px) {
+    html {
+      font-size: 16px;
+    }
+  }
+  .font-condensed { font-family: "Fira Sans Condensed", sans-serif; }
+  .font-inter     { font-family: "Inter", sans-serif; }
+  body {
+    @apply font-serif antialiased text-gray-900 sm:overscroll-y-none;
+  }
+  code, .code {
+    @apply font-mono text-sm text-gray-900 bg-slate-50 px-0.5 py-px rounded dark:bg-gray-800;
+  }
+  code::before, code::after { @apply content-none !important; }
+  h1, h3, h4, h5, h6 {
+    @apply font-condensed font-bold mt-8 first:mt-0;
+  }
+  h2 {
+    /*We cannot collapse margins due to nesting but we want to*/
+    /*keep the h2’s large margin visible*/
+    @apply font-condensed font-bold mt-8 first:mt-2;
+  }
+  h1 { @apply text-4xl; }
+  h2 { @apply text-3xl; }
+  h3 { @apply text-2xl; }
+
+  @media print {
+      h1 { @apply text-2xl !important; }
+      h2 { @apply text-xl !important; }
+      h3 { @apply text-lg !important; }
+  }
+
+  button { @apply focus:outline-none; }
+  strong { @apply font-bold; }
+  em     { @apply italic; }
+  pre    { @apply m-0 font-mono; }
+  table img { @apply inline-block; }
+}
+
+/* Compatibility */
+/* --------------------------------------------------------------- */
+/* TODO: Verify which colors are in use and replace with Tailwind
+   colors accordingly. Move Nj-specific styles out of here. */
+
+:root {
+  --teal-color: #31afd0;
+  --dark-teal-color: #095960;
+  --near-black-color: #2e2e2c;
+  --red-color: #d64242;
+  --dark-blue-color: #1f2937;
+  --dark-blue-60-color: rgba(28, 42, 56, 0.6);
+  --gray-panel-color: rgba(239, 241, 245, 1.000);
+  --brand-color: var(--dark-blue-color);
+  --link-color: #5046e4;
+  --command-bar-selected-color: var(--teal-color);
+}
+
+.serif      { @apply font-serif; }
+.sans-serif { @apply font-sans; }
+.monospace  { @apply font-mono; }
+.inter      { @apply font-inter; }
+
+.border-color-teal { border-color: var(--dark-teal-color); }
+.teal { color: var(--teal-color); }
+.bg-dark-blue { background: var(--dark-blue-color); }
+.bg-dark-blue-60 { background: rgba(28, 42, 56, 0.6); }
+.bg-gray-panel { background: var(--gray-panel-color); }
+.text-dark-blue  { color: var(--dark-blue-color); }
+.text-dark-blue-60 { color: var(--dark-blue-60-color); }
+.border-dark-blue-30 { border-color: rgba(28, 42, 56, 0.6); }
+.text-brand { color: var(--dark-blue-color); }
+.bg-brand { background: var(--dark-blue-color); }
+.text-selected { color: white; }
+.red { color: var(--red-color); }
+
+/* Disclose Button */
+/* --------------------------------------------------------------- */
+
+.disclose {
+  @apply content-none border-solid cursor-pointer inline-block relative mr-[3px] top-[-2px] transition-all;
+  border-color: var(--near-black-color) transparent;
+  border-width: 6px 4px 0;
+}
+.disclose:hover {
+  border-color: var(--near-black-color) transparent;
+}
+.dark .disclose,
+.dark .disclose:hover {
+  border-color: white transparent;
+}
+.disclose.collapsed {
+  @apply rotate-[-90deg];
+}
+
+/* Layout */
+/* --------------------------------------------------------------- */
+
+.page {
+  @apply max-w-5xl mx-auto px-12 box-border flex-shrink-0;
+}
+.max-w-prose { @apply max-w-[46rem] !important; }
+.max-w-wide  { @apply max-w-3xl !important; }
+
+/* List Styles */
+/* --------------------------------------------------------------- */
+
+.task-list-item + .task-list-item,
+.markdown-viewer ul ul {
+  @apply mt-1 mb-0;
+}
+
+/* compact TOC */
+.markdown-viewer .toc ul {
+  list-style: none;
+  @apply my-1;
+}
+
+/* Code Viewer */
+/* --------------------------------------------------------------- */
+
+.code-viewer {
+  @apply font-mono bg-slate-100 rounded-sm text-sm overflow-x-auto dark:bg-gray-800;
+}
+.code-listing  {
+    @apply -ml-8 -mr-8 relative !important;
+}
+.code-viewer .cm-content {
+  @apply py-4 px-8;
+}
+@media (min-width: 960px){
+    .notebook-viewer .code-viewer .cm-content {
+        @apply pl-12;
+    }
+    .notebook-viewer .code-listing {
+        width: 48rem !important;
+        @apply -ml-12 mr-0 !important;
+    }
+}
+/* Don’t show focus outline when double-clicking cell in Safari */
+.cm-scroller { @apply focus:outline-none; }
+
+/* Syntax Highlighting */
+/* --------------------------------------------------------------- */
+
+.inspected-value { @apply text-xs font-mono leading-[1.25rem]; }
+.cmt-strong, .cmt-heading { @apply font-bold; }
+.cmt-italic, .cmt-emphasis { @apply italic; }
+.cmt-strikethrough { @apply line-through; }
+.cmt-link { @apply underline; }
+.untyped-value { @apply whitespace-nowrap; }
+
+.cm-editor, .cmt-default, .result-viewer {
+  @apply text-slate-800 dark:text-slate-300;
+}
+.cmt-keyword {
+  @apply text-purple-800 dark:text-pink-400;
+}
+.cmt-atom, .cmt-bool, .cmt-url, .cmt-contentSeparator, .cmt-labelName {
+  @apply text-blue-900 dark:text-blue-300;
+}
+.cmt-inserted, .cmt-literal {
+  @apply text-emerald-700 dark:text-emerald-200;
+}
+.cmt-string, .cmt-deleted {
+  @apply text-rose-700 dark:text-sky-300;
+}
+.cmt-italic.cmt-string {
+  @apply dark:text-sky-200;
+}
+.cmt-regexp, .cmt-escape {
+  @apply text-orange-500 dark:text-orange-300;
+}
+.cmt-variableName {
+  @apply text-blue-800 dark:text-sky-300;
+}
+.cmt-typeName, .cmt-namespace {
+  @apply text-emerald-600 dark:text-emerald-300;
+}
+.cmt-className {
+  @apply text-teal-600 dark:text-teal-200;
+}
+.cmt-macroName {
+  @apply text-teal-700 dark:text-teal-200;
+}
+.cmt-propertyName {
+  @apply text-blue-700 dark:text-blue-200;
+}
+.cmt-comment {
+  @apply text-slate-500 dark:text-slate-400;
+}
+.cmt-meta {
+  @apply text-slate-600 dark:text-slate-400;
+}
+.cmt-invalid {
+  @apply text-red-500 dark:text-red-300;
+}
+
+.result-data {
+  @apply font-mono text-sm overflow-x-auto whitespace-nowrap leading-normal;
+}
+.result-data::-webkit-scrollbar, .path-nav::-webkit-scrollbar {
+  @apply h-0;
+}
+.result-data-collapsed {
+  @apply whitespace-nowrap;
+}
+.result-data-field {
+  @apply ml-4 whitespace-nowrap;
+}
+.result-data-field-link{
+  @apply ml-4 whitespace-nowrap cursor-pointer;
+}
+.result-data-field-link:hover {
+  @apply text-black bg-black/5;
+}
+.result-text-empty {
+  color: rgba(0,0,0,.3);
+}
+.browsify-button:hover {
+  box-shadow: -2px 0 0 2px #edf2f7;
+}
+
+/* Prose */
+/* --------------------------------------------------------------- */
+
+.notebook-viewer,
+.markdown-viewer {
+  @apply prose
+    dark:prose-invert
+    prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+    dark:prose-a:text-blue-300
+    prose-p:mt-4 prose-p:leading-snug
+    prose-ol:mt-4 prose-ol:mb-6 prose-ol:leading-snug
+    prose-ul:mt-4 prose-ul:mb-6 prose-ul:leading-snug
+    prose-blockquote:mt-4 prose-blockquote:leading-snug
+    prose-hr:mt-6 prose-hr:border-t-2 prose-hr:border-solid prose-hr:border-slate-200
+    prose-figure:mt-4
+    prose-figcaption:mt-2 prose-figcaption:text-xs
+    prose-headings:mb-4
+    prose-table:mt-0
+    prose-th:mb-0
+    prose-img:my-0
+    prose-code:font-medium prose-code:bg-slate-100
+    max-w-none;
+}
+.markdown-viewer blockquote p:first-of-type:before,
+.markdown-viewer blockquote p:last-of-type:after {
+  @apply content-none;
+}
+.markdown-node-viewer.result-viewer.fragment-item {
+    @apply mb-0 !important;
+}
+
+/* Images */
+/* --------------------------------------------------------------- */
+
+
+/* Todo Lists */
+/* --------------------------------------------------------------- */
+
+.contains-task-list {
+  @apply pl-6 list-none;
+}
+.contains-task-list input[type="checkbox"] {
+  @apply appearance-none h-4 w-4 rounded border border-slate-200 relative mr-[0.3rem] ml-[-1.5rem] top-[0.15rem];
+}
+.contains-task-list input[type="checkbox"]:checked {
+  @apply border-indigo-600 bg-indigo-600 bg-no-repeat bg-contain;
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+}
+
+/* Markdown TOC */
+/* --------------------------------------------------------------- */
+
+.markdown-viewer .toc      { @apply mt-4; }
+.markdown-viewer h1 + .toc { @apply mt-8; }
+
+.markdown-viewer .toc h1,
+.markdown-viewer .toc h2,
+.markdown-viewer .toc h3,
+.markdown-viewer .toc h4,
+.markdown-viewer .toc h5,
+.markdown-viewer .toc h6 {
+  @apply text-base text-indigo-600 font-sans my-0;
+}
+.markdown-viewer .toc a {
+  @apply text-indigo-600 font-normal no-underline hover:underline;
+}
+.markdown-viewer .toc li    { @apply m-0; }
+.markdown-viewer .toc ul ul { @apply pl-4; }
+
+/* Notebook Spacing */
+/* --------------------------------------------------------------- */
+
+.markdown-viewer *:first-child:not(.code-viewer):not(li):not(h2):not(.sidenote) { @apply mt-0; }
+/*.viewer + .viewer { @apply mt-6; }*/
+.viewer + .result-viewer { @apply mt-0; }
+.code-viewer + .result-viewer { @apply mt-3; }
+.markdown-viewer + .markdown-viewer { @apply mt-0; }
+
+/* Sidenotes */
+/* --------------------------------------------------------------- */
+
+.sidenote-ref {
+  @apply top-[-0.5em] w-auto h-auto inline border-0 bg-transparent m-0 pointer-events-none;
+}
+.sidenote {
+  @apply block font-sans text-xs mt-4 bg-slate-100 dark:bg-slate-800 p-4;
+  font-style: normal;
+  font-weight: normal;
+}
+.sidenote-container {
+  @apply mb-4;
+}
+@media (min-width: 860px) {
+  .sidenote sup { @apply inline; }
+  .sidenote-column {
+    @apply w-[165px] absolute right-0 top-0 -mr-[205px];
+  }
+  .sidenote {
+    @apply bg-transparent dark:bg-transparent p-0;
+  }
+  .sidenote:first-child {
+    @apply mt-1;
+  }
+  .sidenotes-layout .markdown-viewer {
+    @apply pr-[241px];
+  }
+  .sidenote-container {
+    @apply relative mb-0;
+  }
+  .sidenotes-layout h1 {
+    @apply w-[756px] !important;
+  }
+}
+.code-viewer + .viewer:not(.code-viewer):not(.code-viewer-folded),
+.code-viewer-folded + .viewer:not(.code-viewer):not(.code-viewer-folded),
+.result-viewer:not(.markdown-node-viewer) + .result-viewer {
+  @apply mt-2;
+}
+.code-viewer + .code-viewer-folded {
+  @apply mt-4;
+}
+.result-viewer {
+  @apply leading-tight mb-6;
+}
+.code-viewer.fragment-item.result-viewer {
+  @apply mb-0 !important;
+}
+.result-viewer figure {
+  @apply mt-0 !important;
+}
+@media (min-width: 768px) {
+  .devcard-desc > div {
+    @apply max-w-full m-0;
+  }
+}
+
+/* Command Palette */
+/* --------------------------------------------------------------- */
+
+.nj-commands-input {
+  @apply bg-transparent text-white;
+}
+.nj-context-menu-item:hover:not([disabled]) {
+  @apply cursor-pointer;
+  background-color: rgba(255,255,255,.14);
+}
+
+/* Devdocs */
+/* --------------------------------------------------------------- */
+
+.logo, .logo-white {
+  @apply block indent-[-999em];
+  background: url(/images/nextjournal-logo.svg) center center no-repeat;
+}
+.devdocs-body {
+  @apply font-inter;
+}
+
+/* Workarounds */
+/* --------------------------------------------------------------- */
+
+/* Fixes vega viewer resizing into infinity */
+.vega-embed .chart-wrapper { @apply h-auto !important; }
+/* fixes fraction separators being overridden by tw’s border-color */
+.katex * { @apply border-black; }
+
+@media print {
+    .dark-mode-toggle,
+    .toc-toggle { @apply hidden; }
+    .notebook-viewer { @apply pt-0; font-size: 12pt !important; margin-left: 0 !important; }
+    .code-viewer .cm-content,
+    .viewer-code .cm-content { @apply whitespace-pre-wrap !important; overflow: none; }
+    .code-viewer .cm-line { font-size: 12pt !important; }
+    html * { page-break-inside: avoid !important; }
+    .toc-panel { @apply hidden; }
+}
+</style><script src="./../../../_data/8Vti8PFeQ6xhdP4CLQYrZKk7QkvQ2Rbs5CUr6CtZuDNLfuw1u71qr77zraPXbN6U5ZVKaYbsdh7NWUR3a47SGsFTgq.js" type="module"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.13.13/dist/katex.min.css" rel="stylesheet" type="text/css"><link href="https://fonts.bunny.net" rel="preconnect"><link href="https://fonts.bunny.net/css?family=fira-mono:400,700%7Cfira-sans:400,400i,500,500i,700,700i%7Cfira-sans-condensed:700,700i%7Cpt-serif:400,400i,700,700i" rel="stylesheet" type="text/css"></head><body class="dark:bg-gray-900"><div id="clerk"></div><script type="module">let viewer = nextjournal.clerk.sci_env
+let state = "{:bundle? false, :path->doc {\"notebooks/finance/intro/edit.clj\" {:path [], :nextjournal/value {:toc [], :sidenotes? false, :toc-visibility false, :atom-var-name->state #viewer-eval (nextjournal.clerk.render/intern-atoms! {}), :ns #viewer-eval (ns finance.intro.edit), :file \"notebooks/finance/intro/edit.clj\", :scope finance.intro.edit, :bundle? false, :header {:path [], :nextjournal/value [:div.viewer.w-full.max-w-prose.px-8.not-prose.mt-3 [:div.mb-8.text-xs.sans-serif.text-slate-400 nil [:<> [:a.font-medium.border-b.border-dotted.border-slate-300.hover:text-indigo-500.hover:border-indigo-500.dark:border-slate-500.dark:hover:text-white.dark:hover:border-white.transition {:href \"./../../../\"} \"Index\"] [:span.mx-2 \"•\"]] [:span \"Generated with \" [:a.font-medium.border-b.border-dotted.border-slate-300.hover:text-indigo-500.hover:border-indigo-500.dark:border-slate-500.dark:hover:text-white.dark:hover:border-white.transition {:href \"https://clerk.vision\"} \"Clerk\"] \" from \" [:a.font-medium.border-b.border-dotted.border-slate-300.hover:text-indigo-500.hover:border-indigo-500.dark:border-slate-500.dark:hover:text-white.dark:hover:border-white.transition {:href \"https://github.com/probcomp/gen-finance/blob/420d3c21bc3aa7fda386b97fc3d350c4d531a94e/notebooks/finance/intro/edit.clj\"} \"notebooks/finance/intro/edit.clj\" [:<> \"@\" [:span.tabular-nums \"420d3c2\"]]]]]], :nextjournal/viewer {:name nextjournal.clerk.viewer/html-viewer, :render-fn #viewer-fn nextjournal.clerk.render/render-html, :hash \"5drpr3yzJ1CcHNbRHnK2sVyn7YUmXB\"}}, :open-graph {:type \"article:clerk\", :title nil, :description nil}, :doc-css-class [:overflow-hidden :p-0], :blocks [{:path [], :nextjournal/value {:nextjournal/presented {:path [], :nextjournal/value \"^{:nextjournal.clerk/visibility {:code :hide}}\\n(ns finance.intro\\n  {:nextjournal.clerk/toc true}\\n  (:require [emmy.clerk :as ec]\\n            [emmy.leva :as leva]\\n            [nextjournal.clerk :as clerk]))\\n\\n^{::clerk/visibility {:code :hide :result :hide}}\\n(ec/install!)\\n\\n^{::clerk/visibility {:code :hide :result :hide}}\\n(defn format-money [value]\\n  (clerk/html\\n   [:div.text-right.tabular-nums\\n    (when (neg? value)\\n      [:span.text-red-500 \\\"–\\\"])\\n    [:span.text-slate-400 \\\"$\\\"]\\n    ;; TODO find a way to make this work in SCI.\\n    [:span (format \\\"%.2f\\\" (double (abs value)))]]))\\n\\n;; # Welcome!\\n;;\\n;; This is a port of this [blog\\n;; post](https://andrewchen.com/how-to-create-a-profitable-freemium-startup-spreadsheet-model-included/)\\n;; from Andrew Chen.\\n\\n;; Here are the questions this post (and the spreadsheet) is meant to answer:\\n\\n;; - What are the key factors that drive freemium profitability?\\n;; - How do freemium businesses acquire customers?\\n;; - What are the drivers of customer lifetime value?\\n;; - How do all these variables interact?\\n;;\\n;;\\n;; ## Summary\\n;;\\n;; To become profitable using a freemium business model, this simple equation\\n;; must hold true:\\n;;\\n;; **Lifetime value > Cost per acquisition + Cost of service (paying & free)**\\n;;\\n;;\\n;; ## User Acquisition\\n;;\\n;; The first tab in the spreadsheet covers the issue of paid user acquisition –\\n;; many subscription businesses mostly rely on AdWords and ad network buys in\\n;; order to acquire users. For freemium businesses, particularly ones that are\\n;; social apps, there’s often a word of mouth or viral component, which we’ll\\n;; cover in a second.\\n\\n;; At a high level, here are some of the things you’ll want to track:\\n\\n;; * How are you paying for traffic? (CPM/CPA/CPC)\\n;; * What do the intermediate metrics look like? (impressions/CTR/etc)\\n;; * How does your signup funnel perform?\\n;; * How much are you spending for the users you end up registering?\\n\\n;; Basically, you end up with a media buying matrix that looks something like this:\\n\\n^{::clerk/visibility {:code :hide}}\\n(clerk/table\\n (clerk/use-headers\\n  [[\\\"Source\\\" \\\"Ads bought\\\" \\\"CTR\\\" \\\"Clicks\\\" \\\"Signup %\\\" \\\"Upload pic\\\" \\\"Users\\\" \\\"Cost\\\" \\\"CPA\\\"]\\n   [\\\"Google\\\" \\\"1M\\\" \\\"0.50%\\\" 5000 \\\"20%\\\" \\\"50%\\\" 500 \\\"$5,000.00\\\" \\\"$10.00\\\"]\\n   [\\\"Ad.com\\\" \\\"20M\\\" \\\"0.10%\\\" 20000 \\\"10%\\\" \\\"50%\\\" 1000 \\\"$20,000.00\\\" \\\"$20.00\\\"]]))\\n\\n;; and these are some factors worth thinking about, in terms of increasing or\\n;; decreasing the cost per acquisition (CPA):\\n\\n^{::clerk/visibility {:code :hide}}\\n(clerk/table\\n (clerk/use-headers\\n  [[\\\"Type\\\" \\\"Options\\\" \\\"Importance\\\"]\\n   [\\\"Source of traffic\\\" \\\"Ad networks, publishers\\\" \\\"++\\\"]\\n   [\\\"Cost model\\\" \\\"CPM, CPC, CPA\\\" \\\"+\\\"]\\n   [\\\"User requirements\\\" \\\"Install, browser plug-in, Flash\\\" \\\"+++++\\\"]\\n   [\\\"Audience and theme\\\" \\\"Horizontal vs vertical\\\" \\\"++\\\"]\\n   [\\\"Funnel design\\\" \\\"Landing page, length, fields\\\" \\\"+++\\\"]\\n   [\\\"Viral marketing\\\" \\\"Facebook, Opensocial, email\\\" \\\"+++++\\\"]\\n   [\\\"A/B testing process\\\" \\\"None, homegrown, Google\\\" \\\"+++++\\\"]]))\\n\\n;; ### Model\\n;;\\n;; This first page encodes the following ideas:\\n\\n(defn cpa\\n  [cost users]\\n  (if (zero? users)\\n    ##Inf\\n    (double\\n     (/ cost users))))\\n\\n(defn round [^double x]\\n  (Math/round x))\\n\\n(defn ^:no-doc process-row\\n  \\\"Processes a single row for [[sheet-one]].\\\"\\n  [{:keys [cpm cpc impressions clickthrough signup]\\n    :or   {cpm 0 cpc 0 impressions 0 clickthrough 0 signup 0}}]\\n  (let [clicks (round (* impressions (/ clickthrough 100)))\\n        users  (round (* clicks (/ signup 100)))\\n        cost   (+ (* cpm (/ impressions 1000))\\n                  (* cpc clicks))]\\n    {:users  users\\n     :cost   cost\\n     :clicks clicks}))\\n\\n(defn sheet-one\\n  \\\"Takes a sequence of maps with the following entries, all optional:\\n\\n   :cpm - cost per thousand impressions\\n   :cpc - cost per click\\n   :impressions - total number of impressions\\n   :clickthrough - percentage in the interval [0,100] of clicks per impression\\n   :signup - percentage in the interval [0,100] of signups per click\\n\\n\\n  Returns a map of\\n\\n  ```clojure\\n  {:users  <total users signed up>\\n   :cost   <total cost>\\n   :clicks <total clicks>\\n   :cpa    <total cost per user signup>}\\n  ```\\n  \\\"\\n  [& ms]\\n  (transduce\\n   (map process-row)\\n   (fn\\n     ([] {:users 0 :cost 0 :clicks 0 :cpa ##Inf})\\n     ([m] (assoc m :cpa (cpa (:cost m) (:users m))))\\n     ([l r]\\n      (merge-with + l r)))\\n   ms))\\n\\n^::clerk/sync\\n(defonce !state\\n  (atom {:clickthrough 3.13\\n         :retention 0.8\\n         :free->pay 10\\n         :ad-spend-increase 5\\n         :viral-growth-kicker 0.75}))\\n\\n(leva/controls\\n {:atom '!state\\n  :folder {:name \\\"Config\\\"}\\n  :schema\\n  {:clickthrough        {:min 1 :max 10 :step 0.01}\\n   :retention           {:min 0 :max 1 :step 0.01}\\n   :free->pay           {:min 0 :max 100 :step 0.01}\\n   :ad-spend-increase   {:min 0 :max 100 :step 0.01}\\n   :viral-growth-kicker {:min 0 :max 1 :step 0.01}}})\\n\\n(def spend-metrics\\n  \\\"This data is required input for the remaining charts.\\\"\\n  (sheet-one\\n   {:cpc 1.00\\n    :impressions 1000000\\n    :clickthrough (:clickthrough @!state)\\n    :signup 10}\\n   {:cpm 1.00\\n    :impressions 2000000\\n    :clickthrough 0.5\\n    :signup 20}))\\n\\n;; - TODO - hook up leva sliders, make this more reactive\\n;; - TODO - make these generative\\n\\n;; ## Funnel\\n\\n;; Once you get your users registered onto the site, then there’s the question\\n;; of how convert to paying customers, and whether there are any viral effects.\\n;; The model covered in the spreadsheet has a separate tab, called “Funnel”\\n;; which covers these issues.\\n\\n;; At a high level, there’s what is happening:\\n\\n;; * Each time period, a bunch of newly registered users come in (both acquired through ads or through viral marketing)\\n;; * Some % of these users convert into paying users\\n;; * Some % of these users then send off viral invites\\n;; * Revenue is generated by building up a base of paying users\\n;; * Cost is generated through building up a base of active users (paying or not!)\\n;;\\n;; To me, this tab captures the “art” side of building a freemium business.\\n;; Persuading peopleto pay for your service and invite their friends requires\\n;; creativity, product design, and lots of metrics. Josh Kopelman of First Round\\n;; Capital had a great tweet recently on this topic where he says:\\n;;\\n;; > @joshk: Too many freemium models have too much free and not enough mium\\n\\n;; As Josh notes, the key is to create the right mix of features to segment out\\n;; the people who are willing to pay, but without alienating the users who make\\n;; up your free audience. Do it right, and your conversion rates might be as\\n;; high as 20%. Do it wrong, and your LTV gets very close to zero. This is why\\n;; premium features have to be built into the core of a freemium business,\\n;; rather than added in at the end. You want to be right at the balance between\\n;; free and ‘mium!\\n\\n;; Just remember that during the time period that it takes you to figure out\\n;; your funnel, viral loop, and everything else, all the free users you’re\\n;; building up create cost in your system.\\n\\n;; Businesses that aren’t eyeball businesses shouldn’t act like eyeball\\n;; businesses :-)\\n\\n;; Anyway, the product design issue (and resultant conversion rates) are a a\\n;; deep topic, and here are some other related posts (by others and myself):\\n\\n;; - Thoughts on free powered business models (Charles Hudson)\\n;; - Casual MMOs get between 10-25% of users to pay (Nabeel Hyatt)\\n;; - Successful MMOGs can see $1-$2 in monthly ARPU (Jeremy Liew)\\n;; - Bridging your traffic engine with your revenue engine\\n;; - What’s your viral loop? Understanding your engine of adoption\\n\\n;; ### Model\\n\\n(defn funnel\\n  \\\"Takes 'spend metrics', the output of sheet 1, with these keys:\\n\\n  :users - initial number of registered users\\n  :cost  - total ad spend (cpa == users / cost)\\n\\n  And config:\\n\\n  :free->pay - percentage of free converting to paid / time period\\n  :ad-spend-increase - percentage increase in ad spend / time period\\n\\n  TODO alternatively we could provide CPA and users, and not total cost? but\\n  that's awkward with how we're doing the increase i ad spend.\\n\\n  TODO the sheet also had these...\\n  :invite-conversion-rate\\n  :avg-invites\\n  \\\"\\n  ([metrics] (funnel metrics {}))\\n  ([{:keys [users cost] :or {cost 0 users 0}}\\n    {:keys [free->pay\\n            ad-spend-increase\\n            viral-growth-kicker]\\n     :or {free->pay 0 ad-spend-increase 0 viral-growth-kicker 0}}]\\n   (let [pay-rate   (/ free->pay 100)\\n         paying     (Math/round ^double (* pay-rate users))\\n         init-cpa   (cpa cost users)\\n         spend-rate (inc (/ ad-spend-increase 100.0))\\n         increment  (fn [{:keys [period total-new-users ad-spend\\n                                cumulative-users\\n                                cumulative-paying-users]}]\\n                      (let [spend  (* ad-spend spend-rate)\\n                            viral  (Math/round ^double (* viral-growth-kicker total-new-users))\\n                            bought (Math/round ^double (/ spend init-cpa))\\n                            total  (+ bought viral)\\n                            paying (Math/round ^double (* pay-rate total))]\\n                        {:period (inc period)\\n                         :virally-acquired-users viral\\n                         :bought-users bought\\n                         :ad-spend spend\\n                         :total-new-users total\\n                         :paying-users paying\\n                         :cumulative-users (+ cumulative-users total)\\n                         :cumulative-paying-users (+ cumulative-paying-users paying)\\n                         :cpa (cpa spend total)}))]\\n     (iterate increment\\n              {:period 0\\n               :virally-acquired-users 0\\n               :bought-users users\\n               :ad-spend cost\\n               :total-new-users users\\n               :paying-users paying\\n               :cumulative-users users\\n               :cumulative-paying-users paying\\n               :cpa (cpa cost users)}))))\\n\\n(defn render-metrics\\n  [n data]\\n  (clerk/vl\\n   {:schema \\\"https://vega.github.io/schema/vega-lite/v5.json\\\"\\n    :embed/opts {:actions false}\\n    :data {:values (take n data)}\\n    :width 650 :height 300\\n    :layer\\n    [{:mark :line\\n      :encoding {:x {:field :period :type \\\"temporal\\\"}\\n                 :y {:field :cumulative-users :type \\\"quantitative\\\"}}}\\n     {:mark {:type :line :color :red}\\n      :encoding {:x {:field :period :type \\\"temporal\\\"}\\n                 :y {:field :cumulative-paying-users :type \\\"quantitative\\\"}}}]}))\\n\\n(def funnel-data\\n  (funnel spend-metrics @!state))\\n\\n(clerk/col\\n (clerk/table\\n  (take 10 funnel-data))\\n (render-metrics 10 funnel-data))\\n\\n;; ## User retention\\n\\n;; Of course, it’s not enough to just acquire paying users, you need to retain\\n;; them. If you have a super high churn rate, then at best you’ll be stuck at a\\n;; revenue treadmill (doing lots of work but flat revenue and no profitability).\\n;; At worse, it’s easy to lose a ton of money, if the CPA exceeds the LTV. I\\n;; wrote about this topic earlier in my essay When and why do Facebook apps jump\\n;; the shark (which also has a spreadsheet).\\n;;\\n;; How sensitive are retention numbers on lifetime value? Here’s a quick thought\\n;; experiment: Lifetime value is the sum of the revenue that a user might\\n;; generate from their first time period to when they quit the service. Think of\\n;; it as an infinite sum that looks like:\\n;;\\n\\n^{::clerk/visibility {:code :hide}}\\n(clerk/tex\\n \\\"LTV = rev + rev \\\\\\\\cdot R + rev \\\\\\\\cdot R^2 + rev \\\\\\\\cdot R^3 + \\\\\\\\ldots\\\")\\n\\n;; where $rev$ is the revenue that a user produces during a time period, and $R$\\n;; is the retention rate between time periods.\\n;;\\n;; You can simplify this, based on the [magic of infinite\\n;; series](http://en.wikipedia.org/wiki/List_of_mathematical_series):\\n;;\\n\\n^{::clerk/visibility {:code :hide}}\\n(clerk/tex\\n \\\"LTV = \\\\\\\\frac{1}{1-R} \\\\\\\\cdot rev\\\")\\n\\n;; So let’s say that you make $1 per time period, and you have 1000 paying\\n;; users. Let’s compare the difference between a 50% retention rate and a 75%\\n;; retention rate:\\n;; At a 50% retention rate:\\n;;\\n;; LTV = 1/(1-0.5) * $1 * 1000 = $2000\\n;;\\n;; At a 75% retention rate:\\n;;\\n;; LTV = 1/(1-0.75) * $1 * 1000 =  $4000\\n;;\\n;; This means that in this case, by increasing your retention rate by\\n;; half (relatively speaking), you actually DOUBLE your revenue. And even more\\n;; when you reach “killer app” status and attain retention rates around 90%.\\n;; This is a big lever.\\n\\n;; At a 90% retention rate:\\n;;\\n;; LTV = 1/(1-0.90) * $1 * 1000 = $10,000\\n;;\\n;; Note that retention rates are generally not fixed numbers – they usually get\\n;; better the longer a cohort of users stays with you! I’m using a fixed\\n;; retention number to set a lower bound, and for mathematical simplicity.\\n;;\\n;; OK, so the biggest factors affecting retention boil down to three things:\\n;;\\n;; * Product design\\n;; * Notifications (optimize them, of course)\\n;; * In success cases, saturation effects\\n;;\\n;; For more reading on product design, I’d recommend Designing Interactions from\\n;; IDEO. For notifications, there’s been a lot of great work in the database and\\n;; catalog marketing world, for example Strategic Database Marketing. Tesco,\\n;; Harrah’s, and Amazon are all companies well-known for their strategic use of\\n;; personalization and customer interaction. For saturation effects, as\\n;; previously mentioned, my old-ish article When and why do Facebook apps jump\\n;; the shark.\\n;;\\n;; ### Model\\n\\n(defn retention-fold\\n  \\\"Given a single decay rate, returns a fold:\\n\\n  - 0 arity returns [], starting accumulation\\n  - 1-arity sums all cohort values for this time period\\n  - 2-arity decays out existing cohorts and adds a new, non-decayed cohort\\\"\\n  [rate]\\n  (fn\\n    ([] [])\\n    ([v] (reduce + v))\\n    ([v amt]\\n     (-> (mapv (fn [x] (Math/round ^double (* x rate))) v)\\n         (conj amt)))))\\n\\n(defn scan\\n  \\\"Given a fold and a sequence, returns a sequence of all intermediate states seen\\n  during the fold.\\\"\\n  [fold xs]\\n  (->> (reductions fold (fold) xs)\\n       (rest)\\n       (map fold)))\\n\\n(defn retention\\n  \\\"Accepts a decay rate and key to query, and returns a function of a sequence of\\n  funnel data.\\\"\\n  [rate k]\\n  (fn [funnel-seq]\\n    (scan ((map k)\\n           (retention-fold rate))\\n          funnel-seq)))\\n\\n;; Here are the final rows of this part of the sheet:\\n\\n(defn revenue-per-paying\\n  \\\"Takes a map of percentage => average revenue per customer for that bucket,\\n  returns the average total revenue per paying customer.\\\"\\n  [percent->rev]\\n  (transduce (map (fn [[percent avg-rev]]\\n                    (* percent avg-rev)))\\n             +\\n             percent->rev))\\n\\n(defn process-retention\\n  [retention-rate funnel-seq]\\n  ;; TODO make these inputs obviously\\n  (let [cost-of-service 0.1\\n        revenue-per     (revenue-per-paying\\n                         {0.1 25\\n                          0.4 7.99\\n                          0.5 1.50})]\\n    (map (fn [{:keys [period ad-spend]} paying total-new]\\n           (let [cost-of-service (* cost-of-service total-new)\\n                 revenue         (* revenue-per paying)]\\n             {:period          period\\n              :ad-spend        ad-spend\\n              :paying-users    paying\\n              :total-new-users total-new\\n              :revenue         revenue\\n              :cost-of-service cost-of-service\\n              :total-cost      (+ ad-spend cost-of-service)\\n              :profit-per-user (/ (- revenue ad-spend cost-of-service)\\n                                  paying)}))\\n         funnel-seq\\n         ((retention retention-rate :paying-users) funnel-seq)\\n         ((retention retention-rate :total-new-users) funnel-seq))))\\n\\n(defn render-retention\\n  [n data]\\n  (clerk/vl\\n   {:schema \\\"https://vega.github.io/schema/vega-lite/v5.json\\\"\\n    :embed/opts {:actions false}\\n    :data {:values (take n data)}\\n    :width 650 :height 300\\n    :layer\\n    [{:mark :line\\n      :encoding {:x {:field :period :type \\\"temporal\\\"}\\n                 :y {:field :revenue :type \\\"quantitative\\\"}}}\\n     {:mark {:type :line :color :red}\\n      :encoding {:x {:field :period :type \\\"temporal\\\"}\\n                 :y {:field :total-cost :type \\\"quantitative\\\"}}}]}))\\n\\n(def retention-rate\\n  (:retention @!state))\\n\\n(def retention-data\\n  \\\"decayed out users..\\\"\\n  (process-retention retention-rate funnel-data))\\n\\n(let [n 20]\\n  (clerk/col\\n   (clerk/table\\n    (take n retention-data))\\n   (render-retention n retention-data)))\\n\\n;; Questions\\n;;\\n;; Alternatively we need to get lifetime value in here somehow, based on the\\n;; discussion above. Or is that in the final one?\\n;;\\n;; ## Cashflow (and ad-reinvestment)\\n\\n;; The tab “cashflow” in the spreadsheet captures a couple different issues:\\n;;\\n;; * Paid user acquisition is usually an upfront expense, whereas the revenue\\n;;   comes in over time\\n;; * Your revenue per paying user depends on a mix of revenue sources\\n;; * You pay a “cost of service” across all users, whether they are paying or\\n;;   not – be careful that this cost of service is not too high!!\\n\\n;; Some more detail on the above:\\n\\n;; In a model with paid user acquisition, it takes time to break even. You pay\\n;; for a user upfront, but then the revenue stream trickles in over several time\\n;; periods. As a result, you tend to be cashflow negative for some number of\\n;; time periods, and which then goes positive later. This effect is compounded\\n;; further if your model specifically depends on viral acquisition, because you\\n;; don’t get significant users in virally until your userbase becomes large.\\n\\n;; This is why you get a graph like this, where you’re unprofitable for a while,\\n;; then break even:\\n\\n;; Note that it’s also VERY possible that they never cross, and the entire\\n;; business is unprofitable. Just play around with the numbers in the\\n;; spreadsheet and you can see how easy it is to happen!\\n\\n\\n;; In terms of average revenue per paying customer, what you typically find is\\n;; that your customer base is made up of multiple segments. You can price them\\n;; differently through different tiers of subscription (Free versus Pro versus\\n;; Business) or with Pay-as-you-go or with many other models.\\n\\n\\n;; Ultimately you can roll this all up into a single number, which is referred\\n;; to in the spreadsheet as revenue per paying customer. You can also divide the\\n;; revenue by the number of total users (paying or not) in order to get the\\n;; average revenue per user (ARPU).\\n\\n\\n;; As for the cost of service, your mileage will vary. The main thing is, try\\n;; not to do anything too expensive for free users! After all, given that\\n;; typical conversion rates are <10%, and subscription services are typically\\n;; <$20/month, the following thought experiment is insightful:\\n;;\\n;; * Out of 1000 users, let’s say 50 pay $10/month. This generates $500/month\\n;; * This means that the costs must not exceed $500/month for 1000 users, or $0.50/user\\n;; * Plus then you have to factor in the acquisition cost! (Probably a couple\\n;;   bucks per user, so thousands of bucks per 1000 users).\\n\\n;; ### Model\\n\\n;; TODO table viewer composition... https://clojurians.slack.com/archives/C035GRLJEP8/p1688319224468099?thread_ts=1688297737.386799&cid=C035GRLJEP8\\n\\n;; TODO get the money formatting back on the tables.\\n\\n;; TODO make a graph of ad spend vs revenue, get my vega-lite going.\\n\\n;; ## Lifetime value\\n\\n;; And finally, the last tab on the spreadsheet calculates lifetime value.\\n;; Basically you figure out the number of payments that a paying user will\\n;; generate over their lifetime, referred to in the model as “user periods.” (I\\n;; arbitrarily took this out to 20 time periods, but you can do something\\n;; different) This is then multiplied by revenue per paying user, to get the\\n;; total dollar figure generated.\\n\\n;; NOTE smiling that he doesn't use the infinite series thing from above... but\\n;; we have to ditch that anyway if we want to condition on the actual chance\\n;; that users stuck around per time period.\\n\\n;; More important for the paid acquisition model is to do the LTV calculation\\n;; not for paying users, but for all registered users (paying or free). Doing\\n;; this then lets you figure out if you can profitably arbitrage traffic via ad\\n;; buying. This is done using the same method detailed in the above paragraph,\\n;; but using total user numbers rather than just paying users. Then you compare\\n;; this LTV number with the effective LTV that you get from buying users and\\n;; then factoring in their viral effects (as shown in the Funnel tab).\\n\\n;; ### Model\\n\\n;; SO for this last one... with retention rate, I added everything up across all\\n;; cohorts. But this wants us to do something different.\\n\\n(defn ltv [revenue-per retention-rate]\\n  (/ revenue-per (- 1.0 retention-rate)))\\n\\n(let [xs (funnel\\n          {:users                  5130\\n           :cost                   33300\\n           :free->pay              10\\n           :ad-spend-increase      5\\n           :viral-growth-kicker    0.75\\n           :invite-conversion-rate 15\\n           :avg-invites            5})\\n      periods 20\\n      periods-xs          (take periods xs)\\n      revenue-per         (revenue-per-paying\\n                           {0.1 25\\n                            0.4 7.99\\n                            0.5 1.50})\\n      retention-rate      0.8\\n      ltv (ltv revenue-per retention-rate)]\\n  (clerk/table\\n   {:ltv-paying (into [] (repeat periods (format-money ltv)))\\n\\n    ;; TODO this is just LTV * retention rate for that time period. But this\\n    ;; maybe makes sense to tweak because again we might want to condition on\\n    ;; real data.\\n    :ltv-all (mapv (fn [{:keys [paying-users total-new-users]}]\\n                     (format-money\\n                      (* ltv (/ paying-users total-new-users))))\\n                   periods-xs)}))\\n\\n;; ## Model improvements\\n\\n;; Of course there are tons of things in this model of freemium businesses that ought to be improved!\\n;;\\n;; Benchmarks of real world data for comparison\\n\\n;; * Benchmarks of real world data for comparison\\n;; * More granularity for user acquisition for affiliate versus ad buys versus other\\n;; * Saturation rates in the viral model\\n;; * Better model for retention rate other than one fixed number\\n;; * More sophisticated accounting of cost per user (infrastructure/employees/etc.)\\n;; * Model in multiple revenue sources including transaction fees, for Paypal versus Offerpal versus In-store cards versus mobile\\n;; * Better intelligence around ad-buying, including ramping up when profitable, slowing down when unprofitable\\n\\n;; etc.\\n\\n;; ### Clerk Improvements\\n;;\\n;; - TODO note that without `clerk/tex`, with double-dollars, the toc breaks.\\n;; - here's the video: https://www.youtube.com/watch?v=ztl8eBwq24k\\n;; - mindmap https://media.assembly.org/jussi/blog/vgsummit2008-metrics.pdf\\n\", :nextjournal/visibility {:code :hide, :result :show}, :nextjournal/viewer {:render-fn #viewer-fn nextjournal.clerk.render.editor/view, :hash \"5drezFtVFKXa6Et6NFPfyHcdbGzLuB\"}, :nextjournal/render-opts {:id \"finance.intro.edit/anon-expr-5drwTp662L3hE1yFotxaw1WVfX5EHt-result\"}}, :nextjournal/blob-id \"5dsZWW1T9zMGnsT1QjKVVk36ALHs1F\"}, :nextjournal/render-opts {:id \"finance.intro.edit/anon-expr-5drwTp662L3hE1yFotxaw1WVfX5EHt-result\"}, :nextjournal/visibility {:code :hide, :result :show}, :nextjournal/viewer {:name nextjournal.clerk.viewer/result-viewer, :render-fn #viewer-fn nextjournal.clerk.render/render-result, :hash \"5dtGVHesd2XCTLFYF3aY4kJvkrX1x1\"}}]}, :nextjournal/viewer {:name nextjournal.clerk.viewer/notebook-viewer, :render-fn #viewer-fn nextjournal.clerk.render/render-notebook, :hash \"5duAFDxE4sCnRX71Wo6zeCpC9C3djE\"}}}, :path->url {\"notebooks/finance/intro/edit.clj\" \"notebooks/finance/intro/edit.html\", \"notebooks/finance/intro.clj\" \"\"}, :current-path \"notebooks/finance/intro/edit.clj\", :resource->url {\"/js/viewer.js\" \"_data/8Vti8PFeQ6xhdP4CLQYrZKk7QkvQ2Rbs5CUr6CtZuDNLfuw1u71qr77zraPXbN6U5ZVKaYbsdh7NWUR3a47SGsFTgq.js\"}, :index \"notebooks/finance/intro.clj\"}".replaceAll('nextjournal.clerk.view/escape-closing-script-tag', 'script')
+viewer.init(viewer.read_string(state))
+</script></body></html>
