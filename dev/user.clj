@@ -1,13 +1,18 @@
 (ns user
   (:require [gen.clerk :as clerk]))
 
+(def index
+  "notebooks/finance/intro.clj")
+
 (def serve-defaults
-  {:port 7777
+  {:index index
+   :port 7777
    :watch-paths ["notebooks"]
    :browse? true})
 
 (def static-defaults
   {:browse? false
+   :index index
    :paths ["notebooks/**.clj"]
    :git/url "https://github.com/probcomp/gen-localization"})
 

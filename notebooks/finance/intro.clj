@@ -365,11 +365,14 @@
            :viral-growth-kicker 0.75
            :invite-conversion-rate 15
            :avg-invites 5})
-      ten-periods (take 10 xs)]
-  [((retention 0.8 :paying-users) ten-periods)
-   ((retention 0.8 :total-new-users) ten-periods)])
+      periods (take 20 xs)
+      retention-rate 0.8]
+  (clerk/table
+   {:paying-users
+    ((retention retention-rate :paying-users) periods)
+    :total-users
+    ((retention retention-rate :total-new-users) periods)}))
 
-;;
 ;; Questions
 ;;
 ;; Alternatively we need to get lifetime value in here somehow, based on the
@@ -379,9 +382,11 @@
 
 ;; The tab “cashflow” in the spreadsheet captures a couple different issues:
 ;;
-;; * Paid user acquisition is usually an upfront expense, whereas the revenue comes in over time
+;; * Paid user acquisition is usually an upfront expense, whereas the revenue
+;;   comes in over time
 ;; * Your revenue per paying user depends on a mix of revenue sources
-;; * You pay a “cost of service” across all users, whether they are paying or not – be careful that this cost of service is not too high!!
+;; * You pay a “cost of service” across all users, whether they are paying or
+;;   not – be careful that this cost of service is not too high!!
 
 ;; Some more detail on the above:
 
@@ -424,8 +429,74 @@
 
 ;; ### Model
 
-;; ## Lifetime value
+(defn revenue-per-paying
+  "Takes a map of percentage => average revenue per customer for that bucket,
+  returns the average total revenue per paying customer."
+  [percent->rev]
+  (transduce (map (fn [[percent avg-rev]]
+                    (* percent avg-rev)))
+             +
+             percent->rev))
 
+(defn format-percent [value]
+  (clerk/html
+   [:div.text-right.tabular-nums
+
+    [:span (format "%.2f" (abs value))]
+    [:span.text-slate-400 "%"]]))
+
+(defn format-money [value]
+  (clerk/html
+   [:div.text-right.tabular-nums
+    (when (neg? value)
+      [:span.text-red-500 "–"])
+    [:span.text-slate-400 "$"]
+    ;; TODO make sure this works in cljs.
+    [:span (format "%.2f" (double (abs value)))]]))
+
+
+;; TODO table viewer composition... https://clojurians.slack.com/archives/C035GRLJEP8/p1688319224468099?thread_ts=1688297737.386799&cid=C035GRLJEP8
+
+(let [xs                  (funnel
+                           {:users                  5130
+                            :cost                   33300
+                            :free->pay              10
+                            :ad-spend-increase      5
+                            :viral-growth-kicker    0.75
+                            :invite-conversion-rate 15
+                            :avg-invites            5})
+      periods             (take 20 xs)
+      retention-rate      0.8
+      paying-users        ((retention retention-rate :paying-users) periods)
+      total-users         ((retention retention-rate :total-new-users) periods)
+      ;; cost of servicing each user per time period.
+      cost-of-service     0.1
+      revenue-per         (revenue-per-paying
+                           {0.1 25
+                            0.4 7.99
+                            0.5 1.50})
+      revenue-col         (map #(* revenue-per %) paying-users)
+      ad-spend-col        (map :ad-spend periods)
+      cost-of-service-col (map #(* cost-of-service %) total-users)]
+  (clerk/table
+   {:paying-users    paying-users
+    :total-users     total-users
+    :revenue         (map format-money revenue-col)
+    :ad-spend        (map format-money ad-spend-col)
+    :cost-of-service (map format-money cost-of-service-col)
+    :total-cost      (map (comp format-money +)
+                          ad-spend-col cost-of-service-col)
+    :profit-per-use
+    (map (fn [paying & xs]
+           (format-money (/ (apply - xs) paying)))
+         paying-users
+         revenue-col
+         ad-spend-col
+         cost-of-service-col)}))
+
+;; TODO make a graph of ad spend vs revenue, get my vega-lite going.
+
+;; ## Lifetime value
 
 ;; And finally, the last tab on the spreadsheet calculates lifetime value.
 ;; Basically you figure out the number of payments that a paying user will
@@ -434,6 +505,9 @@
 ;; different) This is then multiplied by revenue per paying user, to get the
 ;; total dollar figure generated.
 
+;; NOTE smiling that he doesn't use the infinite series thing from above... but
+;; we have to ditch that anyway if we want to condition on the actual chance
+;; that users stuck around per time period.
 
 ;; More important for the paid acquisition model is to do the LTV calculation
 ;; not for paying users, but for all registered users (paying or free). Doing
@@ -444,6 +518,39 @@
 ;; then factoring in their viral effects (as shown in the Funnel tab).
 
 ;; ### Model
+
+;; SO for this last one... with retention rate, I added everything up across all
+;; cohorts. But this wants us to do something different.
+
+
+(defn ltv [revenue-per retention-rate]
+  (/ revenue-per (- 1.0 retention-rate)))
+
+(let [xs (funnel
+          {:users                  5130
+           :cost                   33300
+           :free->pay              10
+           :ad-spend-increase      5
+           :viral-growth-kicker    0.75
+           :invite-conversion-rate 15
+           :avg-invites            5})
+      periods             (take 20 xs)
+      revenue-per         (revenue-per-paying
+                           {0.1 25
+                            0.4 7.99
+                            0.5 1.50})
+      retention-rate      0.8
+      ltv (ltv revenue-per retention-rate)]
+  (clerk/table
+   {:ltv-paying (repeat 20 (format-money ltv))
+
+    ;; TODO this is just LTV * retention rate for that time period. But this
+    ;; maybe makes sense to tweak because again we might want to condition on
+    ;; real data.
+    :ltv-all (map (fn [{:keys [paying-users total-new-users]}]
+                    (format-money
+                     (* ltv (/ paying-users total-new-users))))
+                  periods)}))
 
 ;; ## Model improvements
 
