@@ -4,17 +4,22 @@
 (def index
   "notebooks/finance/intro.clj")
 
-(def serve-defaults
+(def defaults
   {:index index
-   :port 7777
-   :watch-paths ["notebooks"]
-   :browse? true})
+   ;; Uncomment this to activate Emmy.
+   :cljs-namespaces '[gen-finance.sci-extensions]
+   })
+
+(def serve-defaults
+  (assoc defaults
+         :port 7777
+         :watch-paths ["notebooks"]
+         :browse? true))
 
 (def static-defaults
-  {:browse? false
-   :index index
-   :paths ["notebooks/**.clj"]
-   :git/url "https://github.com/probcomp/gen-localization"})
+  (assoc defaults
+         :paths ["notebooks/**.clj"]
+         :git/url "https://github.com/probcomp/gen-finance"))
 
 (defn serve!
   "Alias of [[emmy.clerk/serve!]] with [[defaults]] supplied as default arguments.

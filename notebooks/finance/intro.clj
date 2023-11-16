@@ -1,14 +1,28 @@
 ^{:nextjournal.clerk/visibility {:code :hide}}
 (ns finance.intro
   {:nextjournal.clerk/toc true}
-  (:require [nextjournal.clerk :as clerk]))
+  (:require [emmy.clerk :as ec]
+            [emmy.leva :as leva]
+            [nextjournal.clerk :as clerk]))
+
+^{::clerk/visibility {:code :hide :result :hide}}
+(ec/install!)
+
+^{::clerk/visibility {:code :hide :result :hide}}
+(defn format-money [value]
+  (clerk/html
+   [:div.text-right.tabular-nums
+    (when (neg? value)
+      [:span.text-red-500 "–"])
+    [:span.text-slate-400 "$"]
+    ;; TODO find a way to make this work in SCI.
+    [:span (format "%.2f" (double (abs value)))]]))
 
 ;; # Welcome!
 ;;
-;; Hello!
-
-;; https://andrewchen.com/how-to-create-a-profitable-freemium-startup-spreadsheet-model-included/
-
+;; This is a port of this [blog
+;; post](https://andrewchen.com/how-to-create-a-profitable-freemium-startup-spreadsheet-model-included/)
+;; from Andrew Chen.
 
 ;; Here are the questions this post (and the spreadsheet) is meant to answer:
 
@@ -16,16 +30,18 @@
 ;; - How do freemium businesses acquire customers?
 ;; - What are the drivers of customer lifetime value?
 ;; - How do all these variables interact?
-
+;;
+;;
 ;; ## Summary
-
+;;
 ;; To become profitable using a freemium business model, this simple equation
 ;; must hold true:
 ;;
 ;; **Lifetime value > Cost per acquisition + Cost of service (paying & free)**
-
+;;
+;;
 ;; ## User Acquisition
-
+;;
 ;; The first tab in the spreadsheet covers the issue of paid user acquisition –
 ;; many subscription businesses mostly rely on AdWords and ad network buys in
 ;; order to acquire users. For freemium businesses, particularly ones that are
@@ -63,10 +79,6 @@
    ["Viral marketing" "Facebook, Opensocial, email" "+++++"]
    ["A/B testing process" "None, homegrown, Google" "+++++"]]))
 
-
-;; As previously mentioned, lots more
-;; detail [here](http://andrewchenblog.com/2008/11/17/how-to-calculate-cost-per-acquisition-for-startups-relying-on-freemium-subscription-or-virtual-items-biz-models/).
-
 ;; ### Model
 ;;
 ;; This first page encodes the following ideas:
@@ -78,12 +90,15 @@
     (double
      (/ cost users))))
 
+(defn round [^double x]
+  (Math/round x))
+
 (defn ^:no-doc process-row
   "Processes a single row for [[sheet-one]]."
   [{:keys [cpm cpc impressions clickthrough signup]
     :or   {cpm 0 cpc 0 impressions 0 clickthrough 0 signup 0}}]
-  (let [clicks (* impressions (/ clickthrough 100))
-        users  (* clicks (/ signup 100))
+  (let [clicks (round (* impressions (/ clickthrough 100)))
+        users  (round (* clicks (/ signup 100)))
         cost   (+ (* cpm (/ impressions 1000))
                   (* cpc clicks))]
     {:users  users
@@ -119,15 +134,35 @@
       (merge-with + l r)))
    ms))
 
-(sheet-one
- {:cpc 1.00
-  :impressions 1000000
-  :clickthrough 3.13
-  :signup 10}
- {:cpm 1.00
-  :impressions 2000000
-  :clickthrough 0.5
-  :signup 20})
+^::clerk/sync
+(defonce !state
+  (atom {:clickthrough 3.13
+         :retention 0.8
+         :free->pay 10
+         :ad-spend-increase 5
+         :viral-growth-kicker 0.75}))
+
+(leva/controls
+ {:atom '!state
+  :folder {:name "Config"}
+  :schema
+  {:clickthrough        {:min 1 :max 10 :step 0.01}
+   :retention           {:min 0 :max 1 :step 0.01}
+   :free->pay           {:min 0 :max 100 :step 0.01}
+   :ad-spend-increase   {:min 0 :max 100 :step 0.01}
+   :viral-growth-kicker {:min 0 :max 1 :step 0.01}}})
+
+(def spend-metrics
+  "This data is required input for the remaining charts."
+  (sheet-one
+   {:cpc 1.00
+    :impressions 1000000
+    :clickthrough (:clickthrough @!state)
+    :signup 10}
+   {:cpm 1.00
+    :impressions 2000000
+    :clickthrough 0.5
+    :signup 20}))
 
 ;; - TODO - hook up leva sliders, make this more reactive
 ;; - TODO - make these generative
@@ -181,15 +216,13 @@
 ;; ### Model
 
 (defn funnel
-  "Generates a sequence.
-
-  I bet I can do this as a fold, so we get some state and fold in the previous
-  based on parameters. We want to wiggle the params at each phase.
-
-  Key meanings:
+  "Takes 'spend metrics', the output of sheet 1, with these keys:
 
   :users - initial number of registered users
   :cost  - total ad spend (cpa == users / cost)
+
+  And config:
+
   :free->pay - percentage of free converting to paid / time period
   :ad-spend-increase - percentage increase in ad spend / time period
 
@@ -200,58 +233,66 @@
   :invite-conversion-rate
   :avg-invites
   "
-  [{:keys [users
-           cost
-           free->pay
-           ad-spend-increase
-           viral-growth-kicker]
-    :or {free->pay 0 cost 0 users 0 ad-spend-increase 0 viral-growth-kicker 0}}]
-  (let [pay-rate   (/ free->pay 100)
-        paying     (Math/round ^double (* pay-rate users))
-        init-cpa   (cpa cost users)
-        spend-rate (inc (/ ad-spend-increase 100.0))
-        increment  (fn [{:keys [period total-new-users ad-spend
-                               cumulative-users
-                               cumulative-paying-users]}]
-                     (let [spend  (* ad-spend spend-rate)
-                           viral  (Math/round ^double (* viral-growth-kicker total-new-users))
-                           bought (Math/round ^double (/ spend init-cpa))
-                           total  (+ bought viral)
-                           paying (Math/round ^double (* pay-rate total))]
-                       {:period (inc period)
-                        :virally-acquired-users viral
-                        :bought-users bought
-                        :ad-spend spend
-                        :total-new-users total
-                        :paying-users paying
-                        :cumulative-users (+ cumulative-users total)
-                        :cumulative-paying-users (+ cumulative-paying-users paying)
-                        :cpa (cpa spend total)}))]
-    (iterate increment
-             {:period 0
-              :virally-acquired-users 0
-              :bought-users users
-              :ad-spend cost
-              :total-new-users users
-              :paying-users paying
-              :cumulative-users users
-              :cumulative-paying-users paying
-              :cpa (cpa cost users)})))
+  ([metrics] (funnel metrics {}))
+  ([{:keys [users cost] :or {cost 0 users 0}}
+    {:keys [free->pay
+            ad-spend-increase
+            viral-growth-kicker]
+     :or {free->pay 0 ad-spend-increase 0 viral-growth-kicker 0}}]
+   (let [pay-rate   (/ free->pay 100)
+         paying     (Math/round ^double (* pay-rate users))
+         init-cpa   (cpa cost users)
+         spend-rate (inc (/ ad-spend-increase 100.0))
+         increment  (fn [{:keys [period total-new-users ad-spend
+                                cumulative-users
+                                cumulative-paying-users]}]
+                      (let [spend  (* ad-spend spend-rate)
+                            viral  (Math/round ^double (* viral-growth-kicker total-new-users))
+                            bought (Math/round ^double (/ spend init-cpa))
+                            total  (+ bought viral)
+                            paying (Math/round ^double (* pay-rate total))]
+                        {:period (inc period)
+                         :virally-acquired-users viral
+                         :bought-users bought
+                         :ad-spend spend
+                         :total-new-users total
+                         :paying-users paying
+                         :cumulative-users (+ cumulative-users total)
+                         :cumulative-paying-users (+ cumulative-paying-users paying)
+                         :cpa (cpa spend total)}))]
+     (iterate increment
+              {:period 0
+               :virally-acquired-users 0
+               :bought-users users
+               :ad-spend cost
+               :total-new-users users
+               :paying-users paying
+               :cumulative-users users
+               :cumulative-paying-users paying
+               :cpa (cpa cost users)}))))
 
-(clerk/table
- (take 10 (funnel
-           {:users 5130
-            :cost 33300
-            :free->pay 10
-            :ad-spend-increase 5
-            :viral-growth-kicker 0.75
-            :invite-conversion-rate 15
-            :avg-invites 5})))
+(defn render-metrics
+  [n data]
+  (clerk/vl
+   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
+    :embed/opts {:actions false}
+    :data {:values (take n data)}
+    :width 650 :height 300
+    :layer
+    [{:mark :line
+      :encoding {:x {:field :period :type "temporal"}
+                 :y {:field :cumulative-users :type "quantitative"}}}
+     {:mark {:type :line :color :red}
+      :encoding {:x {:field :period :type "temporal"}
+                 :y {:field :cumulative-paying-users :type "quantitative"}}}]}))
 
-;; Notes:
-;;
-;; TODO - graph of users over time!
-;; TODO - tie this into the previous one!
+(def funnel-data
+  (funnel spend-metrics @!state))
+
+(clerk/col
+ (clerk/table
+  (take 10 funnel-data))
+ (render-metrics 10 funnel-data))
 
 ;; ## User retention
 
@@ -324,17 +365,11 @@
 ;; ### Model
 
 (defn retention-fold
-  "Here on the diagonal, starting each time period we have the specific number
-  of paying users.
+  "Given a single decay rate, returns a fold:
 
-  Then we take a rate, and model out decay per 'time period cohort'.
-
-  NOTE Returns a fold!
-
-  The sum of all of the entries for the time period - ie new users for that time
-  period plus the decayed out for all previous time periods - is the true total number of paying users.
-
-  TODO so we do it once with total new users and once with paying users."
+  - 0 arity returns [], starting accumulation
+  - 1-arity sums all cohort values for this time period
+  - 2-arity decays out existing cohorts and adds a new, non-decayed cohort"
   [rate]
   (fn
     ([] [])
@@ -344,12 +379,17 @@
          (conj amt)))))
 
 (defn scan
+  "Given a fold and a sequence, returns a sequence of all intermediate states seen
+  during the fold."
   [fold xs]
   (->> (reductions fold (fold) xs)
        (rest)
        (map fold)))
 
-(defn retention [rate k]
+(defn retention
+  "Accepts a decay rate and key to query, and returns a function of a sequence of
+  funnel data."
+  [rate k]
   (fn [funnel-seq]
     (scan ((map k)
            (retention-fold rate))
@@ -357,21 +397,66 @@
 
 ;; Here are the final rows of this part of the sheet:
 
-(let [xs (funnel
-          {:users 5130
-           :cost 33300
-           :free->pay 10
-           :ad-spend-increase 5
-           :viral-growth-kicker 0.75
-           :invite-conversion-rate 15
-           :avg-invites 5})
-      periods (take 20 xs)
-      retention-rate 0.8]
-  (clerk/table
-   {:paying-users
-    ((retention retention-rate :paying-users) periods)
-    :total-users
-    ((retention retention-rate :total-new-users) periods)}))
+(defn revenue-per-paying
+  "Takes a map of percentage => average revenue per customer for that bucket,
+  returns the average total revenue per paying customer."
+  [percent->rev]
+  (transduce (map (fn [[percent avg-rev]]
+                    (* percent avg-rev)))
+             +
+             percent->rev))
+
+(defn process-retention
+  [retention-rate funnel-seq]
+  ;; TODO make these inputs obviously
+  (let [cost-of-service 0.1
+        revenue-per     (revenue-per-paying
+                         {0.1 25
+                          0.4 7.99
+                          0.5 1.50})]
+    (map (fn [{:keys [period ad-spend]} paying total-new]
+           (let [cost-of-service (* cost-of-service total-new)
+                 revenue         (* revenue-per paying)]
+             {:period          period
+              :ad-spend        ad-spend
+              :paying-users    paying
+              :total-new-users total-new
+              :revenue         revenue
+              :cost-of-service cost-of-service
+              :total-cost      (+ ad-spend cost-of-service)
+              :profit-per-user (/ (- revenue ad-spend cost-of-service)
+                                  paying)}))
+         funnel-seq
+         ((retention retention-rate :paying-users) funnel-seq)
+         ((retention retention-rate :total-new-users) funnel-seq))))
+
+(defn render-retention
+  [n data]
+  (clerk/vl
+   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
+    :embed/opts {:actions false}
+    :data {:values (take n data)}
+    :width 650 :height 300
+    :layer
+    [{:mark :line
+      :encoding {:x {:field :period :type "temporal"}
+                 :y {:field :revenue :type "quantitative"}}}
+     {:mark {:type :line :color :red}
+      :encoding {:x {:field :period :type "temporal"}
+                 :y {:field :total-cost :type "quantitative"}}}]}))
+
+(def retention-rate
+  (:retention @!state))
+
+(def retention-data
+  "decayed out users.."
+  (process-retention retention-rate funnel-data))
+
+(let [n 20]
+  (clerk/col
+   (clerk/table
+    (take n retention-data))
+   (render-retention n retention-data)))
 
 ;; Questions
 ;;
@@ -429,70 +514,9 @@
 
 ;; ### Model
 
-(defn revenue-per-paying
-  "Takes a map of percentage => average revenue per customer for that bucket,
-  returns the average total revenue per paying customer."
-  [percent->rev]
-  (transduce (map (fn [[percent avg-rev]]
-                    (* percent avg-rev)))
-             +
-             percent->rev))
-
-(defn format-percent [value]
-  (clerk/html
-   [:div.text-right.tabular-nums
-
-    [:span (format "%.2f" (abs value))]
-    [:span.text-slate-400 "%"]]))
-
-(defn format-money [value]
-  (clerk/html
-   [:div.text-right.tabular-nums
-    (when (neg? value)
-      [:span.text-red-500 "–"])
-    [:span.text-slate-400 "$"]
-    ;; TODO make sure this works in cljs.
-    [:span (format "%.2f" (double (abs value)))]]))
-
-
 ;; TODO table viewer composition... https://clojurians.slack.com/archives/C035GRLJEP8/p1688319224468099?thread_ts=1688297737.386799&cid=C035GRLJEP8
 
-(let [xs                  (funnel
-                           {:users                  5130
-                            :cost                   33300
-                            :free->pay              10
-                            :ad-spend-increase      5
-                            :viral-growth-kicker    0.75
-                            :invite-conversion-rate 15
-                            :avg-invites            5})
-      periods             (take 20 xs)
-      retention-rate      0.8
-      paying-users        ((retention retention-rate :paying-users) periods)
-      total-users         ((retention retention-rate :total-new-users) periods)
-      ;; cost of servicing each user per time period.
-      cost-of-service     0.1
-      revenue-per         (revenue-per-paying
-                           {0.1 25
-                            0.4 7.99
-                            0.5 1.50})
-      revenue-col         (map #(* revenue-per %) paying-users)
-      ad-spend-col        (map :ad-spend periods)
-      cost-of-service-col (map #(* cost-of-service %) total-users)]
-  (clerk/table
-   {:paying-users    paying-users
-    :total-users     total-users
-    :revenue         (map format-money revenue-col)
-    :ad-spend        (map format-money ad-spend-col)
-    :cost-of-service (map format-money cost-of-service-col)
-    :total-cost      (map (comp format-money +)
-                          ad-spend-col cost-of-service-col)
-    :profit-per-use
-    (map (fn [paying & xs]
-           (format-money (/ (apply - xs) paying)))
-         paying-users
-         revenue-col
-         ad-spend-col
-         cost-of-service-col)}))
+;; TODO get the money formatting back on the tables.
 
 ;; TODO make a graph of ad spend vs revenue, get my vega-lite going.
 
@@ -522,7 +546,6 @@
 ;; SO for this last one... with retention rate, I added everything up across all
 ;; cohorts. But this wants us to do something different.
 
-
 (defn ltv [revenue-per retention-rate]
   (/ revenue-per (- 1.0 retention-rate)))
 
@@ -534,7 +557,8 @@
            :viral-growth-kicker    0.75
            :invite-conversion-rate 15
            :avg-invites            5})
-      periods             (take 20 xs)
+      periods 20
+      periods-xs          (take periods xs)
       revenue-per         (revenue-per-paying
                            {0.1 25
                             0.4 7.99
@@ -542,15 +566,15 @@
       retention-rate      0.8
       ltv (ltv revenue-per retention-rate)]
   (clerk/table
-   {:ltv-paying (repeat 20 (format-money ltv))
+   {:ltv-paying (into [] (repeat periods (format-money ltv)))
 
     ;; TODO this is just LTV * retention rate for that time period. But this
     ;; maybe makes sense to tweak because again we might want to condition on
     ;; real data.
-    :ltv-all (map (fn [{:keys [paying-users total-new-users]}]
-                    (format-money
-                     (* ltv (/ paying-users total-new-users))))
-                  periods)}))
+    :ltv-all (mapv (fn [{:keys [paying-users total-new-users]}]
+                     (format-money
+                      (* ltv (/ paying-users total-new-users))))
+                   periods-xs)}))
 
 ;; ## Model improvements
 
