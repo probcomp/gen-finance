@@ -6,14 +6,12 @@
 
 (def defaults
   {:index index
-   ;; Uncomment this to activate Emmy.
-   :cljs-namespaces '[gen-finance.sci-extensions]
-   })
+   :cljs-namespaces '[gen-finance.sci-extensions]})
 
 (def serve-defaults
   (assoc defaults
          :port 7777
-         :watch-paths ["notebooks"]
+         ;; :watch-paths ["notebooks"]
          :browse? true))
 
 (def static-defaults
@@ -22,7 +20,7 @@
          :git/url "https://github.com/probcomp/gen-finance"))
 
 (defn serve!
-  "Alias of [[emmy.clerk/serve!]] with [[defaults]] supplied as default arguments.
+  "Alias of [[gen.clerk/serve!]] with [[defaults]] supplied as default arguments.
 
   Any supplied `opts` overrides the defaults."
   ([] (serve! {}))
@@ -30,12 +28,12 @@
    (clerk/serve!
     (merge serve-defaults opts))))
 
-(def ^{:doc "Alias for [[emmy.clerk/halt!]]."}
+(def ^{:doc "Alias for [[gen.clerk/halt!]]."}
   halt!
   clerk/halt!)
 
 (defn build!
-  "Alias of [[emmy.clerk/build!]] with [[static-defaults]] supplied as default
+  "Alias of [[gen.clerk/build!]] with [[static-defaults]] supplied as default
   arguments.
 
   Any supplied `opts` overrides the defaults."

@@ -17,8 +17,7 @@
     (when (neg? value)
       [:span.text-red-500 "–"])
     [:span.text-slate-400 "$"]
-    ;; TODO find a way to make this work in SCI.
-    [:span (format "%.2f" (double (abs value)))]]))
+    [:span (format "%.2f" (double (Math/abs value)))]]))
 
 ;; # Welcome!
 ;;
@@ -286,19 +285,20 @@
     :width 650 :height 300
     :layer
     [{:mark :line
-      :encoding {:x {:field :period :type "temporal"}
+      :encoding {:x {:field :period :type "quantitative"}
                  :y {:field :cumulative-users :type "quantitative"}}}
      {:mark {:type :line :color :red}
-      :encoding {:x {:field :period :type "temporal"}
+      :encoding {:x {:field :period :type "quantitative"}
                  :y {:field :cumulative-paying-users :type "quantitative"}}}]}))
 
 (def funnel-data
   (funnel spend-metrics @!state))
 
-(clerk/col
- (clerk/table
-  (take 10 funnel-data))
- (render-metrics 10 funnel-data))
+(let [n 10]
+  (clerk/col
+   (clerk/table
+    (take n funnel-data))
+   (render-metrics n funnel-data)))
 
 ;; ## User retention
 
