@@ -1,8 +1,9 @@
 (ns gen-finance.sci-extensions
   "SCI environment extensions for Gen + Emmy."
   (:require [emmy.viewer.sci]
-            [goog.string :as gs]
+            [gen.choicemap]
             [gen.sci]
+            [goog.string :as gs]
             [sci.core :as sci]
             [sci.ctx-store]))
 
@@ -11,4 +12,5 @@
 (sci.ctx-store/swap-ctx!
  sci/merge-opts
  {:namespaces
-  {'clojure.core {'format gs/format}}})
+  {'clojure.core {'format gs/format}
+   'gen.choicemap (sci/copy-ns gen.choicemap (sci/create-ns 'gen.choicemap))}})

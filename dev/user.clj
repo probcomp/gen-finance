@@ -2,7 +2,7 @@
   (:require [gen.clerk :as clerk]))
 
 (def index
-  "notebooks/finance/intro.clj")
+  "notebooks/finance/model/edit.clj")
 
 (def defaults
   {:index index
