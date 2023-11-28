@@ -7,6 +7,7 @@
             [gen.choicemap :as choicemap]
             [gen.distribution.kixi :as kixi]
             [gen.dynamic :as dynamic :refer [gen]]
+            [gen.inference.importance :as importance]
             [gen.trace :as trace]
             [gen.generative-function :as gf]
             [nextjournal.clerk :as clerk]))
@@ -55,6 +56,12 @@
   (double
    (/ cost users)))
 
+(defn total-value [simulation]
+  (reduce (fn [value {:keys [revenue total-cost]}]
+            (+ value (- revenue total-cost)))
+          0.0
+          simulation))
+
 (def simulate-business
   (gen [{:keys [users cost] :or {users 0 cost 0}}
         {:keys [periods
@@ -71,81 +78,75 @@
                 free->pay           0
                 ad-spend-increase   0
                 viral-growth-kicker 0}}]
-    (let [retention-rate (dynamic/trace! :retention kixi/normal retention-mean 0.05)
-          cost-per-user (dynamic/trace! :cost-of kixi/normal cost-of-service 0.01)
-          pay-rate        (/ free->pay 100)
-          paying          (round (* pay-rate users))
-          revenue         (* revenue-per-paying paying)
-          init-cpa        (cpa cost users)
-          spend-rate      (inc (/ ad-spend-increase 100.0))
-          cost-of-service (* cost-per-user users)
-          initial         {:period                  0
-                           :ad-spend                cost
-                           :total-new-users         users
-                           :virally-acquired-users  0
-                           :bought-users            users
-                           :paying-users            paying
-                           :revenue                 revenue
-                           :cost-of-service         cost-of-service
-                           :total-cost              (+ cost cost-of-service)
-                           :profit-per-user         (/ (- revenue cost cost-of-service)
-                                                       paying)
-                           :cumulative-users        users
-                           :cumulative-paying-users paying
-                           :cpa                     (cpa cost users)}]
-      (take periods
-            (iterate
-             (fn [prev]
-               (let [new-spend        (* spend-rate (:ad-spend prev))
-                     viral-users      (round (* viral-growth-kicker (:total-new-users prev)))
-                     bought-users     (round (/ new-spend init-cpa))
-                     total-new-users  (+ bought-users viral-users)
-                     new-paying-users (round (* pay-rate total-new-users))
-                     users-sum        (round
-                                       (+ (* retention-rate
-                                             (:cumulative-users prev))
-                                          total-new-users))
-                     paying-sum       (round
-                                       (+ (* retention-rate
-                                             (:cumulative-paying-users prev))
-                                          new-paying-users))
-                     cost-of-service  (* cost-per-user users-sum)
-                     total-cost       (+ new-spend cost-of-service)
-                     revenue          (* revenue-per-paying paying-sum)]
-                 {:period                  (inc (:period prev))
-                  :ad-spend                new-spend
-                  :total-new-users         total-new-users
-                  :virally-acquired-users  viral-users
-                  :bought-users            bought-users
-                  :paying-users            new-paying-users
-                  :revenue                 revenue
-                  :cost-of-service         cost-of-service
-                  :total-cost              total-cost
-                  :profit-per-user         (/ (- revenue total-cost)
-                                              new-paying-users)
-                  :cumulative-users        users-sum
-                  :cumulative-paying-users paying-sum
-                  :cpa                     (cpa new-spend total-new-users)}))
-             initial)))))
-
-(defn total-value [simulation]
-  (reduce (fn [value {:keys [revenue total-cost]}]
-            (+ value (- revenue total-cost)))
-          0.0
-          simulation))
+       (let [retention-rate (dynamic/trace! :retention kixi/normal retention-mean 0.05)
+             cost-per-user (dynamic/trace! :cost-of kixi/normal cost-of-service 0.01)
+             pay-rate        (/ free->pay 100)
+             paying          (round (* pay-rate users))
+             revenue         (* revenue-per-paying paying)
+             init-cpa        (cpa cost users)
+             spend-rate      (inc (/ ad-spend-increase 100.0))
+             cost-of-service (* cost-per-user users)
+             initial         {:period                  0
+                              :ad-spend                cost
+                              :total-new-users         users
+                              :virally-acquired-users  0
+                              :bought-users            users
+                              :paying-users            paying
+                              :revenue                 revenue
+                              :cost-of-service         cost-of-service
+                              :total-cost              (+ cost cost-of-service)
+                              :profit-per-user         (/ (- revenue cost cost-of-service)
+                                                          paying)
+                              :cumulative-users        users
+                              :cumulative-paying-users paying
+                              :cpa                     (cpa cost users)}
+             simulation
+             (take periods
+                   (iterate
+                    (fn [prev]
+                      (let [new-spend        (* spend-rate (:ad-spend prev))
+                            viral-users      (round (* viral-growth-kicker (:total-new-users prev)))
+                            bought-users     (round (/ new-spend init-cpa))
+                            total-new-users  (+ bought-users viral-users)
+                            new-paying-users (round (* pay-rate total-new-users))
+                            users-sum        (round
+                                              (+ (* retention-rate
+                                                    (:cumulative-users prev))
+                                                 total-new-users))
+                            paying-sum       (round
+                                              (+ (* retention-rate
+                                                    (:cumulative-paying-users prev))
+                                                 new-paying-users))
+                            cost-of-service  (* cost-per-user users-sum)
+                            total-cost       (+ new-spend cost-of-service)
+                            revenue          (* revenue-per-paying paying-sum)]
+                        {:period                  (inc (:period prev))
+                         :ad-spend                new-spend
+                         :total-new-users         total-new-users
+                         :virally-acquired-users  viral-users
+                         :bought-users            bought-users
+                         :paying-users            new-paying-users
+                         :revenue                 revenue
+                         :cost-of-service         cost-of-service
+                         :total-cost              total-cost
+                         :profit-per-user         (/ (- revenue total-cost)
+                                                     new-paying-users)
+                         :cumulative-users        users-sum
+                         :cumulative-paying-users paying-sum
+                         :cpa                     (cpa new-spend total-new-users)}))
+                    initial))
+             value (total-value simulation)]
+         (dynamic/trace! :total-value kixi/normal value 0.001)
+         simulation)))
 
 (defn simulation-choices
   [{:keys [initial-data config]}]
-  (let [traces (repeatedly
-                (:trials config 10)
-                (fn []
-                  (gf/simulate simulate-business [initial-data config])))]
-    (map (fn [trace]
-           (let [sim (trace/get-retval trace)]
-             (-> (choicemap/->map
-                  (trace/get-choices trace))
-                 (assoc :total-value (total-value sim)))))
-         traces)))
+  (repeatedly
+   (:trials config 10)
+   (fn []
+     (choicemap/->map
+      (trace/get-choices
+       (gf/simulate simulate-business [initial-data config]))))))
 
 (defn choices->scatterplot [data]
   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
@@ -189,6 +190,8 @@
 ;;
 ;; - `:trials`: total number of simulations to generate
 ;; - `:periods`: number of time periods to simulate the business
+;; - `:value-target`: the goal business value, used for importance sampling.
+;; - `:n-samples`: number of samples used in importance sampling
 ;; - `:free->pay`: percentage of users that convert from free => paid each time period
 ;; - `:ad-spend-increase`: percentage increase in ad spending per period
 ;; - `:viral-growth-kicker`: ratio of new viral users to last time period's total new users
@@ -199,6 +202,8 @@
 (def config
   {:trials              10
    :periods             20
+   :value-target        10000
+   :n-samples           10
    :free->pay           10
    :ad-spend-increase   5
    :viral-growth-kicker 0.75
@@ -243,29 +248,33 @@
 ;; The final chart shows a histogram of total business value generated by all
 ;; trials.
 
+(def schema
+  {"Simulation Params"
+   (leva/folder
+    {:trials       {:min 0 :max 1000 :step 5}
+     :periods      {:min 1 :max 50 :step 1}
+     :value-target {:min 0 :max 10000000 :step 1000}
+     :n-samples    {:min 0 :max 100 :step 5}}
+    {:order -1})
+
+   "Business Config"
+   (leva/folder
+    {:retention-mean      {:min 0 :max 1 :step 0.01}
+     :free->pay           {:min 0 :max 100 :step 0.01}
+     :ad-spend-increase   {:min 0 :max 100 :step 0.01}
+     :viral-growth-kicker {:min 0 :max 1 :step 0.01}
+     :cost-of-service     {:min 0 :max 10 :step 0.01}
+     :revenue-per-paying  {:min 0 :max 70 :step 0.01}})})
+
 ^{::clerk/visibility {:code :hide}}
 (ev/with-let [!state config]
   [:<>
    (leva/controls
     {:atom   !state
-     :schema
-     {"Simulation Params"
-      (leva/folder
-       {:trials  {:min 0 :max 1000 :step 5}
-        :periods {:min 1 :max 50 :step 1}}
-       {:order -1})
-
-      "Business Config"
-      (leva/folder
-       {:retention-mean      {:min 0 :max 1 :step 0.01}
-        :free->pay           {:min 0 :max 100 :step 0.01}
-        :ad-spend-increase   {:min 0 :max 100 :step 0.01}
-        :viral-growth-kicker {:min 0 :max 1 :step 0.01}
-        :cost-of-service     {:min 0 :max 10 :step 0.01}
-        :revenue-per-paying  {:min 0 :max 70 :step 0.01}})}})
-   (list 'let ['data (list `simulation-choices
-                           {:initial-data `initial-data
-                            :config       (list 'deref !state)})
+     :schema schema})
+   (list 'let ['config {:initial-data `initial-data
+                        :config       (list 'deref !state)}
+               'data  (list `simulation-choices 'config)
                'trial (list `simulate-business
                             `initial-data
                             (list 'deref !state))]
@@ -276,3 +285,31 @@
            (list `choices->scatterplot 'data)]
           ['nextjournal.clerk.render/render-vega-lite
            (list `value-histogram 'data)]])])
+
+;; ## Inference
+;;
+;; Not a great visualization, but here's a start:
+
+(defn do-inference
+  [{:keys [initial-data config]}]
+  (let [{:keys [trials value-target n-samples]} config
+        infer (fn []
+                (-> (importance/resampling simulate-business
+                                           [initial-data config]
+                                           {:total-value value-target}
+                                           n-samples)
+                    (:trace)
+                    (trace/get-choices)
+                    (choicemap/->map)))]
+    (repeatedly trials infer)))
+
+^{::clerk/visibility {:code :hide}}
+(ev/with-let [!state config]
+  [:<>
+   (leva/controls
+    {:atom !state :schema schema})
+   ['nextjournal.clerk.render/render-vega-lite
+    (list `choices->scatterplot
+          (list `do-inference
+                {:initial-data `initial-data
+                 :config  (list 'deref !state)}))]])
