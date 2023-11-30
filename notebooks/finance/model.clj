@@ -39,7 +39,9 @@
   (str (if (neg? value)
          "–$"
          "$")
-       (format "%.2f" (double (Math/abs value)))))
+       (format "%.2f"
+               (double
+                (Math/abs ^double value)))))
 
 (defn ->table [sim]
   (clerk/table
@@ -62,6 +64,40 @@
           0.0
           simulation))
 
+;; TODO add separate generative function - `create-business`,
+
+(declare simulate-business)
+
+(def create-business
+  (gen []
+       (let [retention-mean  (dynamic/trace! :retention kixi/uniform 0 100)
+             cost-of-service (dynamic/trace! :cost-of-service kixi/uniform 0 80)
+             simulation      (dynamic/trace! :business
+                                             (simulate-business
+                                              {:retention-mean retention-mean
+                                               }))]
+         ;; TODO add more elements.
+         ;;
+         ;; TODO ths is where `:total-value` should actually be traced.
+         )))
+
+;; TODO first version - teach them what the simulator is, and what they're
+;; learning as they see multiple simulations at once. (this is sliders attached
+;; to simulate-business, basically what we ahve now.)
+;;
+;; TODO next thing - inference. what if you observed some data about the
+;; business? can you use the business model to work backwards and infer the
+;; slider values?
+;;
+;; - show some data, infer slider values NOTE how?
+
+;;
+;; TODO is there a version of this business that has value more than something?
+;;
+;; - constrain on total value > sometime.
+;;
+;; 3 pages in the thing.
+
 (def simulate-business
   (gen [{:keys [users cost] :or {users 0 cost 0}}
         {:keys [periods
@@ -79,7 +115,8 @@
                 ad-spend-increase   0
                 viral-growth-kicker 0}}]
        (let [retention-rate (dynamic/trace! :retention kixi/normal retention-mean 0.05)
-             cost-per-user (dynamic/trace! :cost-of kixi/normal cost-of-service 0.01)
+             cost-per-user  (dynamic/trace! :cost-of kixi/normal cost-of-service 0.01)
+
              pay-rate        (/ free->pay 100)
              paying          (round (* pay-rate users))
              revenue         (* revenue-per-paying paying)
@@ -120,6 +157,15 @@
                             cost-of-service  (* cost-per-user users-sum)
                             total-cost       (+ new-spend cost-of-service)
                             revenue          (* revenue-per-paying paying-sum)]
+                        ;; TODO turn each of these into a trace call like [:period i]....
+                        ;;
+                        ;; TODO turn the noise into a business-level parameter,
+                        ;; so that we can loosen things up in case inference
+                        ;; goes nuts.
+                        ;;
+                        ;;
+                        ;; TODO add a "simulation config" parameter that we can
+                        ;; set with a slider.
                         {:period                  (inc (:period prev))
                          :ad-spend                new-spend
                          :total-new-users         total-new-users
@@ -294,14 +340,25 @@
   [{:keys [initial-data config]}]
   (let [{:keys [trials value-target n-samples]} config
         infer (fn []
-                (-> (importance/resampling simulate-business
-                                           [initial-data config]
-                                           {:total-value value-target}
-                                           n-samples)
+                (-> (importance/resampling
+                     simulate-business
+                     [initial-data config]
+                     {:total-value value-target}
+                     n-samples)
                     (:trace)
                     (trace/get-choices)
                     (choicemap/->map)))]
     (repeatedly trials infer)))
+
+(defn infer-scatterplot [data]
+  {:schema "https://vega.github.io/schema/vega-lite/v5.json"
+   :embed/opts {:actions false}
+   :width 650 :height 300
+   :data {:values data}
+   :layer
+   [{:mark :point
+     :encoding {:x {:field :retention :type "quantitative"}
+                :y {:field :cost-of :type "quantitative"}}}]})
 
 ^{::clerk/visibility {:code :hide}}
 (ev/with-let [!state config]
@@ -309,7 +366,7 @@
    (leva/controls
     {:atom !state :schema schema})
    ['nextjournal.clerk.render/render-vega-lite
-    (list `choices->scatterplot
+    (list `infer-scatterplot
           (list `do-inference
                 {:initial-data `initial-data
                  :config  (list 'deref !state)}))]])
