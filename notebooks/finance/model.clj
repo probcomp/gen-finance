@@ -89,16 +89,16 @@
                {period record})
              sim)))
 
-(def record-row!
+(def record-row
   (gen [row wiggle]
-    (doseq [[k v] row]
-      (dynamic/trace! k kixi/normal v wiggle))))
-
-(def record-business!
-  (gen [simulation wiggle]
-       (doseq [{:keys [period] :as row} simulation]
-         (dynamic/trace! period record-row! row wiggle))
-       simulation))
+    (persistent!
+     (reduce-kv
+      (fn [acc k v]
+        (if (= k :period)
+          (assoc! acc k v)
+          (assoc! acc k (dynamic/trace! k kixi/normal v wiggle))))
+      (transient {})
+      row))))
 
 (def simulate-business
   (gen [{:keys [users cost] :or {users 0 cost 0}}
@@ -117,105 +117,101 @@
                 free->pay           0
                 ad-spend-increase   0
                 viral-growth-kicker 0
-                wiggle              0.1}}]
-       (let [pay-rate        (/ free->pay 100)
-             paying          (round (* pay-rate users))
-             revenue         (* revenue-per-paying paying)
-             init-cpa        (cpa cost users)
-             spend-rate      (inc (/ ad-spend-increase 100.0))
-             cost-of-service (* cost-of-service users)
-             initial         {:period                  0
-                              :ad-spend                cost
-                              :total-new-users         users
-                              :virally-acquired-users  0
-                              :bought-users            users
-                              :paying-users            paying
-                              :revenue                 revenue
-                              :cost-of-service         cost-of-service
-                              :total-cost              (+ cost cost-of-service)
-                              :profit-per-user         (/ (- revenue cost cost-of-service)
-                                                          paying)
-                              :cumulative-users        users
-                              :cumulative-paying-users paying
-                              :cpa                     (cpa cost users)}
-             simulation
-             (take periods
-                   (iterate
-                    (fn [prev]
-                      (let [new-spend        (* spend-rate (:ad-spend prev))
-                            viral-users      (round (* viral-growth-kicker (:total-new-users prev)))
-                            bought-users     (round (/ new-spend init-cpa))
-                            total-new-users  (+ bought-users viral-users)
-                            new-paying-users (round (* pay-rate total-new-users))
-                            users-sum        (round
-                                              (+ (* retention-rate
-                                                    (:cumulative-users prev))
-                                                 total-new-users))
-                            paying-sum       (round
-                                              (+ (* retention-rate
-                                                    (:cumulative-paying-users prev))
-                                                 new-paying-users))
-                            cost-of-service  (* cost-of-service users-sum)
-                            total-cost       (+ new-spend cost-of-service)
-                            revenue          (* revenue-per-paying paying-sum)]
-                        {:period                  (inc (:period prev))
-                         :ad-spend                new-spend
-                         :total-new-users         total-new-users
-                         :virally-acquired-users  viral-users
-                         :bought-users            bought-users
-                         :paying-users            new-paying-users
-                         :revenue                 revenue
-                         :cost-of-service         cost-of-service
-                         :total-cost              total-cost
-                         :profit-per-user         (/ (- revenue total-cost)
-                                                     new-paying-users)
-                         :cumulative-users        users-sum
-                         :cumulative-paying-users paying-sum
-                         :cpa                     (cpa new-spend total-new-users)}))
-                    initial))]
-         (dynamic/splice! record-business! simulation wiggle))))
+                wiggle              0.01}}]
+    (let [pay-rate        (/ free->pay 100)
+          paying          (round (* pay-rate users))
+          revenue         (* revenue-per-paying paying)
+          init-cpa        (cpa cost users)
+          spend-rate      (inc (/ ad-spend-increase 100.0))
+          cost-of-service (* cost-of-service users)
+          initial         (dynamic/trace!
+                           0
+                           record-row
+                           {:period                  0
+                            :ad-spend                cost
+                            :total-new-users         users
+                            :virally-acquired-users  0
+                            :bought-users            users
+                            :paying-users            paying
+                            :revenue                 revenue
+                            :cost-of-service         cost-of-service
+                            :total-cost              (+ cost cost-of-service)
+                            :profit-per-user         (/ (- revenue cost cost-of-service)
+                                                        paying)
+                            :cumulative-users        users
+                            :cumulative-paying-users paying
+                            :cpa                     (cpa cost users)}
+                           wiggle)]
+      (->> (iterate
+            (fn [prev]
+              (let [period           (inc (:period prev))
+                    new-spend        (* spend-rate (:ad-spend prev))
+                    viral-users      (round (* viral-growth-kicker (:total-new-users prev)))
+                    bought-users     (round (/ new-spend init-cpa))
+                    total-new-users  (+ bought-users viral-users)
+                    new-paying-users (round (* pay-rate total-new-users))
+                    users-sum        (round
+                                      (+ (* retention-rate
+                                            (:cumulative-users prev))
+                                         total-new-users))
+                    paying-sum       (round
+                                      (+ (* retention-rate
+                                            (:cumulative-paying-users prev))
+                                         new-paying-users))
+                    cost-of-service  (* cost-of-service users-sum)
+                    total-cost       (+ new-spend cost-of-service)
+                    revenue          (* revenue-per-paying paying-sum)]
+                (dynamic/trace!
+                 period
+                 record-row
+                 {:period                  period
+                  :ad-spend                new-spend
+                  :total-new-users         total-new-users
+                  :virally-acquired-users  viral-users
+                  :bought-users            bought-users
+                  :paying-users            new-paying-users
+                  :revenue                 revenue
+                  :cost-of-service         cost-of-service
+                  :total-cost              total-cost
+                  :profit-per-user         (/ (- revenue total-cost)
+                                              new-paying-users)
+                  :cumulative-users        users-sum
+                  :cumulative-paying-users paying-sum
+                  :cpa                     (cpa new-spend total-new-users)}
+                 wiggle)))
+            initial)
+           (take periods)
+           (into [])))))
+
 
 (def create-business
   (gen [initial-data {:keys [value-target periods]}]
-       (let [free->pay           (dynamic/trace! :free->pay kixi/uniform 0 100)
-             ad-spend-increase   (dynamic/trace! :ad-spend-increase kixi/uniform 0 100)
-             viral-growth-kicker (dynamic/trace! :viral-growth-kicker kixi/uniform 0 2)
-             retention-rate      (dynamic/trace! :retention-rate kixi/uniform 0 1)
-             cost-of-service     (dynamic/trace! :cost-of-service kixi/uniform 0 80)
-             revenue-per-paying  (dynamic/trace! :revenue-per-paying kixi/uniform 0 80)
-             simulation          (dynamic/trace!
-                                  :simulation
-                                  simulate-business
-                                  initial-data
-                                  {:periods periods
-                                   :free->pay           free->pay
-                                   :ad-spend-increase   ad-spend-increase
-                                   :viral-growth-kicker viral-growth-kicker
-                                   :retention-rate      retention-rate
-                                   :cost-of-service     cost-of-service
-                                   :revenue-per-paying  revenue-per-paying})
-             value           (total-value simulation)]
-         (dynamic/trace! :total-value kixi/normal value 0.001)
-         (when value-target
-           (dynamic/trace! :profitable?
-                           kixi/bernoulli
-                           (if (> value value-target)
-                             1.0
-                             0.0)))
-         simulation)))
-
-(defn choices->scatterplot [data]
-  {:schema "https://vega.github.io/schema/vega-lite/v5.json"
-   :embed/opts {:actions false}
-   :width 650 :height 300
-   :data {:values data}
-   :layer
-   [{:mark :point
-     :encoding {:x {:field :retention :type "quantitative"}
-                :y {:field :total-value :type "quantitative"}}}
-    {:mark {:type :point :color :red}
-     :encoding {:x {:field :cost-of :type "quantitative"}
-                :y {:field :total-value :type "quantitative"}}}]})
+    (let [free->pay           (dynamic/trace! :free->pay kixi/uniform 0 100)
+          ad-spend-increase   (dynamic/trace! :ad-spend-increase kixi/uniform 0 100)
+          viral-growth-kicker (dynamic/trace! :viral-growth-kicker kixi/uniform 0 2)
+          retention-rate      (dynamic/trace! :retention-rate kixi/uniform 0 1)
+          cost-of-service     (dynamic/trace! :cost-of-service kixi/uniform 0 80)
+          revenue-per-paying  (dynamic/trace! :revenue-per-paying kixi/uniform 0 80)
+          simulation          (dynamic/trace!
+                               :simulation
+                               simulate-business
+                               initial-data
+                               {:periods periods
+                                :free->pay           free->pay
+                                :ad-spend-increase   ad-spend-increase
+                                :viral-growth-kicker viral-growth-kicker
+                                :retention-rate      retention-rate
+                                :cost-of-service     cost-of-service
+                                :revenue-per-paying  revenue-per-paying})
+          value           (total-value simulation)]
+      (dynamic/trace! :total-value kixi/normal value 0.001)
+      (when value-target
+        (dynamic/trace! :profitable?
+                        kixi/bernoulli
+                        (if (> value value-target)
+                          1.0
+                          0.0)))
+      simulation)))
 
 (defn value-histogram [data]
   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
@@ -353,14 +349,17 @@
         prefix (take (Math/floor (* periods (/ prefix 100)))
                      sim)
         infer (fn []
+                ;; TODO we need to figure out why the constraints are not
+                ;; getting applied.
                 (-> (importance/resampling
                      create-business
                      [initial-data config]
-                     {:simulation (reduce into (sim->choicemaps prefix))}
+                     {:simulation (sim->choicemaps prefix)}
                      n-samples)
                     (:trace)
                     (trace/get-choices)
-                    (choicemap/get-values-shallow)
+                    ;; TODO remove this to get the full set of values.
+                    #_(choicemap/get-values-shallow)
                     (choicemap/->map)))]
     (repeatedly trials infer)))
 
@@ -371,7 +370,7 @@
    :data {:values data}
    :layer
    [{:mark :point
-     :encoding {:x {:field :retention-rate :type "quantitative"}
+     :encoding {:x {:field :ad-spend-increase :type "quantitative"}
                 :y {:field :cost-of-service :type "quantitative"}}}]})
 
 ^{::clerk/visibility {:code :hide}}
@@ -389,7 +388,5 @@
          [:<>
           ['nextjournal.clerk.render/inspect
            (list `->table 'sim)]
-          ['nextjournal.clerk.render/inspect
-           (list `first 'inf)]
           ['nextjournal.clerk.render/render-vega-lite
            (list `infer-scatterplot 'inf)]])])
