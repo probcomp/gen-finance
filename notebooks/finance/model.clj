@@ -267,7 +267,8 @@
    :retention-rate      0.8
    :cost-of-service     0.1
    :revenue-per-paying  6.446
-   :prefix              0})
+   :prefix              0
+   :wiggle              0.01})
 
 ;; `simulate-business` lets us simulate the history of a business with all of
 ;; the assumptions from `config`:
@@ -318,7 +319,8 @@
    "Inference"
    (leva/folder
     {:value-target {:min 0 :max 10000000 :step 1000}
-     :n-samples    {:min 0 :max 100 :step 5}
+     :wiggle       {:min 0 :max 5 :step 0.01}
+     :n-samples    {:min 0 :max 500 :step 5}
      :trials       {:min 0 :max 1000 :step 5}
      :prefix       {:min 0 :max 100 :step 10}})})
 
@@ -345,7 +347,7 @@
 
 (defn do-inference
   [{:keys [initial-data config sim]}]
-  (let [{:keys [prefix periods trials n-samples]} config
+  (let [{:keys [prefix periods trials n-samples value-target]} config
         prefix (take (Math/floor (* periods (/ prefix 100)))
                      sim)
         infer (fn []
@@ -354,12 +356,15 @@
                 (-> (importance/resampling
                      create-business
                      [initial-data config]
-                     {:simulation (sim->choicemaps prefix)}
+                     (merge (dissoc config
+                                    :retention-rate
+                                    :cost-of-service)
+                            {:simulation (sim->choicemaps prefix)})
                      n-samples)
                     (:trace)
                     (trace/get-choices)
                     ;; TODO remove this to get the full set of values.
-                    #_(choicemap/get-values-shallow)
+                    (choicemap/get-values-shallow)
                     (choicemap/->map)))]
     (repeatedly trials infer)))
 
@@ -370,7 +375,7 @@
    :data {:values data}
    :layer
    [{:mark :point
-     :encoding {:x {:field :ad-spend-increase :type "quantitative"}
+     :encoding {:x {:field :retention-rate :type "quantitative"}
                 :y {:field :cost-of-service :type "quantitative"}}}]})
 
 ^{::clerk/visibility {:code :hide}}
