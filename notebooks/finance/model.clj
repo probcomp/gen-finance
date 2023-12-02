@@ -123,7 +123,8 @@
           revenue         (* revenue-per-paying paying)
           init-cpa        (cpa cost users)
           spend-rate      (inc (/ ad-spend-increase 100.0))
-          cost-of-service (* cost-of-service users)
+          cost-per-user   cost-of-service
+          cost-of-service (* cost-per-user users)
           initial         (dynamic/trace!
                            0
                            record-row
@@ -158,7 +159,7 @@
                                       (+ (* retention-rate
                                             (:cumulative-paying-users prev))
                                          new-paying-users))
-                    cost-of-service  (* cost-of-service users-sum)
+                    cost-of-service  (* cost-per-user users-sum)
                     total-cost       (+ new-spend cost-of-service)
                     revenue          (* revenue-per-paying paying-sum)]
                 (dynamic/trace!
