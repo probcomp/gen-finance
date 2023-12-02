@@ -1,15 +1,16 @@
 ^{:nextjournal.clerk/visibility {:code :hide}}
 (ns finance.model
   {:nextjournal.clerk/toc true}
-  (:require [emmy.clerk :as ec]
+  (:require [clojure.set :as set]
+            [emmy.clerk :as ec]
             [emmy.leva :as leva]
             [emmy.viewer :as ev]
             [gen.choicemap :as choicemap]
             [gen.distribution.kixi :as kixi]
             [gen.dynamic :as dynamic :refer [gen]]
+            [gen.generative-function :as gf]
             [gen.inference.importance :as importance]
             [gen.trace :as trace]
-            [gen.generative-function :as gf]
             [nextjournal.clerk :as clerk]))
 
 {::clerk/visibility {:code :hide :result :hide}}
@@ -302,6 +303,14 @@
 ;;
 ;; Then, the table from above.
 
+(def business-config
+  {:retention-rate      {:min 0 :max 1 :step 0.01}
+   :free->pay           {:min 0 :max 100 :step 0.01}
+   :ad-spend-increase   {:min 0 :max 100 :step 0.01}
+   :viral-growth-kicker {:min 0 :max 1 :step 0.01}
+   :cost-of-service     {:min 0 :max 10 :step 0.01}
+   :revenue-per-paying  {:min 0 :max 70 :step 0.01}})
+
 (def schema
   {"Simulation Params"
    (leva/folder
@@ -309,19 +318,13 @@
     {:order -1})
 
    "Business Config"
-   (leva/folder
-    {:retention-rate      {:min 0 :max 1 :step 0.01}
-     :free->pay           {:min 0 :max 100 :step 0.01}
-     :ad-spend-increase   {:min 0 :max 100 :step 0.01}
-     :viral-growth-kicker {:min 0 :max 1 :step 0.01}
-     :cost-of-service     {:min 0 :max 10 :step 0.01}
-     :revenue-per-paying  {:min 0 :max 70 :step 0.01}})
+   (leva/folder business-config)
 
    "Inference"
    (leva/folder
     {:value-target {:min 0 :max 10000000 :step 1000}
      :wiggle       {:min 0 :max 5 :step 0.01}
-     :n-samples    {:min 0 :max 500 :step 5}
+     :n-samples    {:min 0 :max 100 :step 5}
      :trials       {:min 0 :max 1000 :step 5}
      :prefix       {:min 0 :max 100 :step 10}})})
 
@@ -346,6 +349,10 @@
 ;;
 ;; Not a great visualization, but here's a start:
 
+(def fields-to-infer #{:cost-of-service})
+
+{::clerk/visibility {:code :hide :result :hide}}
+
 (defn do-inference
   [{:keys [initial-data config sim]}]
   (let [{:keys [prefix periods trials n-samples value-target]} config
@@ -357,9 +364,8 @@
                 (-> (importance/resampling
                      create-business
                      [initial-data config]
-                     (merge (dissoc config
-                                    :retention-rate
-                                    :cost-of-service)
+                     (merge (select-keys config (set/difference (set (keys config))
+                                                                fields-to-infer))
                             {:simulation (sim->choicemaps prefix)})
                      n-samples)
                     (:trace)
@@ -369,17 +375,18 @@
                     (choicemap/->map)))]
     (repeatedly trials infer)))
 
-(defn infer-scatterplot [data]
-  {:schema "https://vega.github.io/schema/vega-lite/v5.json"
+(defn infer-strip-plot [field min max data]
+  {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
    :embed/opts {:actions false}
-   :width 650 :height 300
    :data {:values data}
-   :layer
-   [{:mark :point
-     :encoding {:x {:field :retention-rate :type "quantitative"}
-                :y {:field :cost-of-service :type "quantitative"}}}]})
+   :mark {:type "tick"
+          :clip true}
+   :encoding {:x {:field field
+                  :type "quantitative"
+                  :scale {:domain [min max]}}}})
 
-^{::clerk/visibility {:code :hide}}
+{::clerk/visibility {:code :hide :result :show}}
+
 (ev/with-let [!state config]
   [:<>
    (leva/controls
@@ -394,5 +401,9 @@
          [:<>
           ['nextjournal.clerk.render/inspect
            (list `->table 'sim)]
-          ['nextjournal.clerk.render/render-vega-lite
-           (list `infer-scatterplot 'inf)]])])
+
+          (into [:<> [:h2 "Inferred parameters"]]
+                (for [[field {:keys [min max]}]
+                      (select-keys business-config fields-to-infer)]
+                  ['nextjournal.clerk.render/render-vega-lite
+                   (list `infer-strip-plot field min max 'inf)]))])])
