@@ -375,6 +375,17 @@
                     (choicemap/->map)))]
     (repeatedly trials infer)))
 
+(defn infer-histogram [field min max data]
+  {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
+   :data {:values data}
+   :mark {:type "bar"
+          :clip true}
+   :encoding
+   {:x {:bin true
+        :field field
+        :scale {:domain [min max]}}
+    :y {:aggregate "count"}}})
+
 (defn infer-strip-plot [field min max data]
   {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
    :embed/opts {:actions false}
@@ -403,7 +414,9 @@
            (list `->table 'sim)]
 
           (into [:<> [:h2 "Inferred parameters"]]
-                (for [[field {:keys [min max]}]
-                      (select-keys business-config fields-to-infer)]
-                  ['nextjournal.clerk.render/render-vega-lite
-                   (list `infer-strip-plot field min max 'inf)]))])])
+                (mapcat (fn [[field {:keys [min max]}]]
+                          [['nextjournal.clerk.render/render-vega-lite
+                            (list `infer-histogram field min max 'inf)]
+                           ['nextjournal.clerk.render/render-vega-lite
+                            (list `infer-strip-plot field min max 'inf)]])
+                        (select-keys business-config fields-to-infer)))])])
