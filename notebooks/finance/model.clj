@@ -289,17 +289,22 @@
 ;; - `:revenue-per-paying`: revenue per paying customer per time period
 
 (def config
-  {:trials              10
+  {;; Simulation parameters
+   :trials              10
    :periods             20
    :value-target        10000
    :n-samples           10
+
+   ;; Business configuration
    :free->pay           10
    :ad-spend-increase   5
    :viral-growth-kicker 0.75
    :retention-rate      0.8
    :cost-of-service     0.1
    :revenue-per-paying  6.446
-   :prefix              0
+
+   ;; Inference configuration
+   :prefix              50
    :wiggle              0.01})
 
 ;; `simulate-business` lets us simulate the history of a business with all of
