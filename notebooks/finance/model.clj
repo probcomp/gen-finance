@@ -14,10 +14,36 @@
             [nextjournal.clerk :as clerk]))
 
 {::clerk/visibility {:code :hide :result :hide}}
+
 (ec/install!)
+
+(defn deep-merge-with
+  "Like merge-with, but merges maps recursively, applying the given fn
+  only when there's a non-map at a particular level.
+  (deep-merge-with + {:a {:b {:c 1 :d {:x 1 :y 2}} :e 3} :f 4}
+                     {:a {:b {:c 2 :d {:z 9} :z 3} :e 100}})
+  -> {:a {:b {:z 3, :c 3, :d {:z 9, :x 1, :y 2}}, :e 103}, :f 4}"
+  [f & maps]
+  ;; Source: https://clojure.github.io/clojure-contrib/map-utils-api.html#clojure.contrib.map-utils/deep-merge-with
+  (apply (fn m [& maps]
+           (if (every? map? maps)
+             (apply merge-with m maps)
+             (apply f maps)))
+         maps))
+
+(defn deep-merge
+  [& maps]
+  (apply deep-merge-with merge maps))
 
 (defn round [^double x]
   (Math/round x))
+
+(defn domain
+  [k data]
+  (let [values (map #(get % k)
+                    data)]
+    [(apply min values)
+     (apply max values)]))
 
 (defn revenue+cost-schema
   [data]
@@ -26,9 +52,12 @@
    :data {:values data}
    :width 600 :height 300
    :repeat {:layer [:revenue :total-cost]}
-   :spec {:mark :line
+   :spec {:mark {:type :area
+                 :line {:strokeWidth 4}
+                 :fillOpacity 0.25}
           :encoding {:x {:field :period
-                         :type "quantitative"}
+                         :type "quantitative"
+                         :scale {:domain (domain :period data)}}
                      :y {:title "US dollars"
                          :field {:repeat :layer}
                          :type "quantitative"}
@@ -372,24 +401,6 @@
                     (choicemap/get-values-shallow)
                     (choicemap/->map)))]
     (repeatedly trials infer)))
-
-(defn deep-merge-with
-  "Like merge-with, but merges maps recursively, applying the given fn
-  only when there's a non-map at a particular level.
-  (deep-merge-with + {:a {:b {:c 1 :d {:x 1 :y 2}} :e 3} :f 4}
-                     {:a {:b {:c 2 :d {:z 9} :z 3} :e 100}})
-  -> {:a {:b {:z 3, :c 3, :d {:z 9, :x 1, :y 2}}, :e 103}, :f 4}"
-  [f & maps]
-  ;; Source: https://clojure.github.io/clojure-contrib/map-utils-api.html#clojure.contrib.map-utils/deep-merge-with
-  (apply (fn m [& maps]
-           (if (every? map? maps)
-             (apply merge-with m maps)
-             (apply f maps)))
-         maps))
-
-(defn deep-merge
-  [& maps]
-  (apply deep-merge-with merge maps))
 
 (defn infer-histogram [field min max data]
   {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
