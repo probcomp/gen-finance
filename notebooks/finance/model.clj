@@ -379,20 +379,23 @@
 
 {::clerk/visibility {:code :hide :result :hide}}
 
-(def fields-to-infer #{:cost-of-service})
+(def fields-to-infer #{:retention-rate :revenue-per-paying :free->pay})
 
 (defn do-inference
   [{:keys [initial-data config sim]}]
   (let [{:keys [prefix periods trials n-samples value-target]} config
         prefix (take (Math/floor (* periods (/ prefix 100)))
                      sim)
+        constraints (merge (select-keys config (set/difference (set (keys config))
+                                                               fields-to-infer))
+                           {:simulation (sim->choicemaps prefix)
+                            ;; :profitable? true
+                            })
         infer (fn []
                 (-> (importance/resampling
                      create-business
                      [initial-data config]
-                     (merge (select-keys config (set/difference (set (keys config))
-                                                                fields-to-infer))
-                            {:simulation (sim->choicemaps prefix)})
+                     constraints
                      n-samples)
                     (:trace)
                     (trace/get-choices)
