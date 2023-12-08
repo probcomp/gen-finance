@@ -384,7 +384,13 @@
 
 {::clerk/visibility {:code :hide :result :hide}}
 
-(def fields-to-infer #{:retention-rate :revenue-per-paying :free->pay})
+(def fields-to-infer
+  #{;; :ad-spend-increase
+    :revenue-per-paying
+    :retention-rate
+    ;; :viral-growth-kicker
+    ;; :cost-of-service
+    :free->pay})
 
 (defn do-inference
   [{:keys [initial-data config sim]}]
