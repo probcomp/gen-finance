@@ -346,12 +346,10 @@
            (list `->table 'sim)]])])
 
 ;; ## Inference
-;;
-;; Not a great visualization, but here's a start:
-
-(def fields-to-infer #{:cost-of-service})
 
 {::clerk/visibility {:code :hide :result :hide}}
+
+(def fields-to-infer #{:cost-of-service})
 
 (defn do-inference
   [{:keys [initial-data config sim]}]
@@ -359,8 +357,6 @@
         prefix (take (Math/floor (* periods (/ prefix 100)))
                      sim)
         infer (fn []
-                ;; TODO we need to figure out why the constraints are not
-                ;; getting applied.
                 (-> (importance/resampling
                      create-business
                      [initial-data config]
@@ -375,16 +371,33 @@
                     (choicemap/->map)))]
     (repeatedly trials infer)))
 
+(defn deep-merge-with
+  "Like merge-with, but merges maps recursively, applying the given fn
+  only when there's a non-map at a particular level.
+  (deep-merge-with + {:a {:b {:c 1 :d {:x 1 :y 2}} :e 3} :f 4}
+                     {:a {:b {:c 2 :d {:z 9} :z 3} :e 100}})
+  -> {:a {:b {:z 3, :c 3, :d {:z 9, :x 1, :y 2}}, :e 103}, :f 4}"
+  [f & maps]
+  ;; Source: https://clojure.github.io/clojure-contrib/map-utils-api.html#clojure.contrib.map-utils/deep-merge-with
+  (apply (fn m [& maps]
+           (if (every? map? maps)
+             (apply merge-with m maps)
+             (apply f maps)))
+         maps))
+
+(defn deep-merge
+  [& maps]
+  (apply deep-merge-with merge maps))
+
 (defn infer-histogram [field min max data]
   {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
    :data {:values data}
    :mark {:type "bar"
           :clip true}
-   :encoding
-   {:x {:bin true
-        :field field
-        :scale {:domain [min max]}}
-    :y {:aggregate "count"}}})
+   :encoding {:x {:bin true
+                  :field field
+                  :scale {:domain [min max]}}
+              :y {:aggregate "count"}}})
 
 (defn infer-strip-plot [field min max data]
   {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
@@ -395,6 +408,16 @@
    :encoding {:x {:field field
                   :type "quantitative"
                   :scale {:domain [min max]}}}})
+
+(defn infer-union-plot [field min max data]
+  {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
+   :embed/opts {:actions false}
+   :data {:values data}
+   :spacing 10
+   :bounds :flush
+   :vconcat [(deep-merge (infer-histogram field min max data)
+                         {:encoding {:x {:axis nil}}})
+             (infer-strip-plot field min max data)]})
 
 {::clerk/visibility {:code :hide :result :show}}
 
@@ -414,9 +437,7 @@
            (list `->table 'sim)]
 
           (into [:<> [:h2 "Inferred parameters"]]
-                (mapcat (fn [[field {:keys [min max]}]]
-                          [['nextjournal.clerk.render/render-vega-lite
-                            (list `infer-histogram field min max 'inf)]
-                           ['nextjournal.clerk.render/render-vega-lite
-                            (list `infer-strip-plot field min max 'inf)]])
-                        (select-keys business-config fields-to-infer)))])])
+                (map (fn [[field {:keys [min max]}]]
+                       ['nextjournal.clerk.render/render-vega-lite
+                        (list `infer-union-plot field min max 'inf)])
+                     (select-keys business-config fields-to-infer)))])])
