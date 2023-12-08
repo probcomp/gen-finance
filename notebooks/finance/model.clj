@@ -487,7 +487,6 @@
                               :virally-acquired-users
                               :bought-users
                               :profit-per-user
-                              :period
                               :total-new-users
                               :cost-of-service
                               :cpa
