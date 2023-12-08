@@ -156,7 +156,7 @@
           spend-rate      (inc (/ ad-spend-increase 100.0))
           cost-per-user   cost-of-service
           cost-of-service (* cost-per-user users)
-          initial         (dynamic/trace!
+          initial-period  (dynamic/trace!
                            0
                            record-row
                            {:period                  0
@@ -173,45 +173,42 @@
                             :cumulative-users        users
                             :cumulative-paying-users paying
                             :cpa                     (cpa cost users)}
-                           wiggle)]
-      (->> (iterate
-            (fn [prev]
-              (let [period           (inc (:period prev))
-                    new-spend        (* spend-rate (:ad-spend prev))
-                    viral-users      (round (* viral-growth-kicker (:total-new-users prev)))
-                    bought-users     (round (/ new-spend init-cpa))
-                    total-new-users  (+ bought-users viral-users)
-                    new-paying-users (round (* pay-rate total-new-users))
-                    users-sum        (round
-                                      (+ (* retention-rate
-                                            (:cumulative-users prev))
-                                         total-new-users))
-                    paying-sum       (round
-                                      (+ (* retention-rate
-                                            (:cumulative-paying-users prev))
-                                         new-paying-users))
-                    cost-of-service  (* cost-per-user users-sum)
-                    total-cost       (+ new-spend cost-of-service)
-                    revenue          (* revenue-per-paying paying-sum)]
-                (dynamic/trace!
-                 period
-                 record-row
-                 {:period                  period
-                  :ad-spend                new-spend
-                  :total-new-users         total-new-users
-                  :virally-acquired-users  viral-users
-                  :bought-users            bought-users
-                  :paying-users            new-paying-users
-                  :revenue                 revenue
-                  :cost-of-service         cost-of-service
-                  :total-cost              total-cost
-                  :profit-per-user         (/ (- revenue total-cost)
-                                              new-paying-users)
-                  :cumulative-users        users-sum
-                  :cumulative-paying-users paying-sum
-                  :cpa                     (cpa new-spend total-new-users)}
-                 wiggle)))
-            initial)
+                           wiggle)
+          next-period     (fn [prev]
+                            (let [period           (inc (:period prev))
+                                  new-spend        (* spend-rate (:ad-spend prev))
+                                  viral-users      (round (* viral-growth-kicker (:total-new-users prev)))
+                                  bought-users     (round (/ new-spend init-cpa))
+                                  total-new-users  (+ bought-users viral-users)
+                                  new-paying-users (round (* pay-rate total-new-users))
+                                  users-sum        (round (+ (* retention-rate
+                                                                (:cumulative-users prev))
+                                                             total-new-users))
+                                  paying-sum       (round (+ (* retention-rate
+                                                                (:cumulative-paying-users prev))
+                                                             new-paying-users))
+                                  cost-of-service  (* cost-per-user users-sum)
+                                  total-cost       (+ new-spend cost-of-service)
+                                  revenue          (* revenue-per-paying paying-sum)]
+                              (dynamic/trace!
+                               period
+                               record-row
+                               {:period                  period
+                                :ad-spend                new-spend
+                                :total-new-users         total-new-users
+                                :virally-acquired-users  viral-users
+                                :bought-users            bought-users
+                                :paying-users            new-paying-users
+                                :revenue                 revenue
+                                :cost-of-service         cost-of-service
+                                :total-cost              total-cost
+                                :profit-per-user         (/ (- revenue total-cost)
+                                                            new-paying-users)
+                                :cumulative-users        users-sum
+                                :cumulative-paying-users paying-sum
+                                :cpa                     (cpa new-spend total-new-users)}
+                               wiggle)))]
+      (->> (iterate next-period initial-period)
            (take periods)
            (into [])))))
 
