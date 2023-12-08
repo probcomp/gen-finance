@@ -8,7 +8,6 @@
             [gen.choicemap :as choicemap]
             [gen.distribution.kixi :as kixi]
             [gen.dynamic :as dynamic :refer [gen]]
-            [gen.generative-function :as gf]
             [gen.inference.importance :as importance]
             [gen.trace :as trace]
             [nextjournal.clerk :as clerk]))
