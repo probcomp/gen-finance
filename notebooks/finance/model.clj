@@ -24,14 +24,16 @@
   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
    :embed/opts {:actions false}
    :data {:values data}
-   :width 650 :height 300
-   :layer
-   [{:mark :line
-     :encoding {:x {:field :period :type "quantitative"}
-                :y {:field :revenue :type "quantitative"}}}
-    {:mark {:type :line :color :red}
-     :encoding {:x {:field :period :type "quantitative"}
-                :y {:field :total-cost :type "quantitative"}}}]})
+   :width 600 :height 300
+   :repeat {:layer [:revenue :total-cost]}
+   :spec {:mark :line
+          :encoding {:x {:field :period
+                         :type "quantitative"}
+                     :y {:title "US dollars"
+                         :field {:repeat :layer}
+                         :type "quantitative"}
+                     :color {:datum {:repeat :layer}
+                             :type :nominal}}}})
 
 (def revenue+cost-chart
   (comp clerk/vl revenue+cost-schema))
