@@ -248,7 +248,7 @@
 (defn value-histogram [data]
   {:schema "https://vega.github.io/schema/vega-lite/v5.json"
    :embed/opts {:actions false}
-   :width 650 :height 300
+   :width 600 :height 300
    :data {:values data}
    :mark {:type :bar :color :blue}
    :encoding {:x {:bin true :field :total-value}
@@ -397,7 +397,7 @@
                     (:trace)
                     (trace/get-choices)
                     ;; TODO remove this to get the full set of values.
-                    (choicemap/get-values-shallow)
+                    #_(choicemap/get-values-shallow)
                     (choicemap/->map)))]
     (repeatedly trials infer)))
 
@@ -431,6 +431,27 @@
                          {:encoding {:x {:axis nil}}})
              (infer-strip-plot field min max data)]})
 
+(defn projection-plot
+  [field inf]
+  (let [datas (map (fn [business]
+                     (mapv (fn [[period m]]
+                             (assoc m :period period))
+                           (:simulation business)))
+                   inf)]
+    {:$schema "https://vega.github.io/schema/vega-lite/v5.json"
+     :embed/opts {:actions false}
+     :width 600
+     :height 300
+     :layer (for [data datas]
+              {:data {:values data}
+               :mark {:type :line
+                      :strokeOpacity 0.25}
+               :encoding {:x {:field :period
+                              :type :quantitative
+                              :scale {:domain (domain :period data)}}
+                          :y {:field field
+                              :type :quantitative}}})}))
+
 {::clerk/visibility {:code :hide :result :show}}
 
 (ev/with-let [!state config]
@@ -452,4 +473,21 @@
                 (map (fn [[field {:keys [min max]}]]
                        ['nextjournal.clerk.render/render-vega-lite
                         (list `infer-union-plot field min max 'inf)])
-                     (select-keys business-config fields-to-infer)))])])
+                     (select-keys business-config fields-to-infer)))
+
+          (into [:<> [:h2 "Inferred fields"]]
+                (for [field #{:revenue
+                              :cumulative-paying-users
+                              :total-cost
+                              :ad-spend
+                              :cumulative-users
+                              :virally-acquired-users
+                              :bought-users
+                              :profit-per-user
+                              :period
+                              :total-new-users
+                              :cost-of-service
+                              :cpa
+                              :paying-users}]
+                  ['nextjournal.clerk.render/render-vega-lite
+                   (list `projection-plot field 'inf)]))])])
