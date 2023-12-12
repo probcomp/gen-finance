@@ -4,7 +4,7 @@
          org.mentat/emmy               {:mvn/version "0.31.0"}
          org.mentat/emmy-viewers       {:mvn/version "0.3.1"}
          io.github.inferenceql/gen.clj
-         {:git/sha "743e9d25da926d1d3f43ada66ccbdbd60e4af156"}
+         {:git/sha "8d427e95dc3a10c94b40305dac366f270b921c7c"}
 
          io.github.nextjournal/clerk   {:git/sha "d80187013d7b7b96db3d8b114b8d99f687170668"}
          io.github.nextjournal/clerk.render
